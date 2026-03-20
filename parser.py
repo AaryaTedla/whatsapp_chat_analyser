@@ -5,7 +5,6 @@ from typing import Dict, List, Optional
 
 # Example WhatsApp lines (varies by locale/export):
 # 20/03/2020, 09:15 - John Doe: Hello
-# 14/10/25, 2:31 pm - Pavithraa: My data is not working
 # 20/03/2020, 09:15 - Messages to this group are now secured with end-to-end encryption.
 _LINE_RE = re.compile(
     r"^(?P<date>\d{1,2}/\d{1,2}/\d{2,4}),\s*(?P<time>\d{1,2}:\d{2})\s*(?P<ampm>am|pm)?\s*-\s*(?P<rest>.*)$",
