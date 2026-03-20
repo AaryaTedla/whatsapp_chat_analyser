@@ -700,7 +700,7 @@
           renderAI(ai);
 
           if (reportId) {
-            reportLink.innerHTML = `Saved report #${reportId}: <a href="/reports/${reportId}/view">Open report</a> · <a href="/reports/${reportId}/txt">Download TXT</a>`;
+            reportLink.innerHTML = `Saved report #${reportId}: <a href="/r/${reportId}">Open report</a> · <a href="/reports/${reportId}/txt">Download TXT</a>`;
             reportLink.classList.remove('hidden');
           } else {
             reportLink.innerHTML = '';

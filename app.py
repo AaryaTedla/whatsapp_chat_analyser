@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 
 from dotenv import load_dotenv
-from flask import Flask, Response, jsonify, render_template, request
+from flask import Flask, Response, jsonify, redirect, render_template, request
 from werkzeug.utils import secure_filename
 
 from analyser import compute_stats, generate_ai_summary
@@ -153,12 +153,18 @@ def get_report(report_id: int):
     return jsonify(report)
 
 
-@app.route("/reports/<int:report_id>/view", methods=["GET"])
+@app.route("/r/<int:report_id>", methods=["GET"])
 def view_report(report_id: int):
     report = _fetch_report(report_id)
     if not report:
         return "Report not found", 404
     return render_template("report_view.html", report=report)
+
+
+@app.route("/reports/<int:report_id>/view", methods=["GET"])
+def view_report_legacy(report_id: int):
+    # Keep legacy URL working while moving users to a shorter route.
+    return redirect(f"/r/{report_id}", code=302)
 
 
 @app.route("/reports/<int:report_id>/txt", methods=["GET"])
