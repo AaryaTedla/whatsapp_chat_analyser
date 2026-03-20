@@ -227,11 +227,11 @@ def analyze():
     return jsonify({"stats": stats, "ai": ai, "report_id": report_id})
 
 
+_init_db()
+
+
 if __name__ == "__main__":
     # For local development only.
     debug = os.getenv("FLASK_DEBUG", "1") == "1"
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")), debug=debug)
-
-
-_init_db()
 
