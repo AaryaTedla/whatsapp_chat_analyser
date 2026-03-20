@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lumira WhatsApp Chat Analyser</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      :root {
+        --bg: #0b0f14;
+        --panel: #121826;
+        --panel-2: #0f1522;
+        --text: #e6edf3;
+        --muted: #9aa4b2;
+        --border: rgba(255, 255, 255, 0.08);
+        --primary: #7c3aed;
+        --primary-2: #a78bfa;
+        --good: #22c55e;
+        --warn: #f59e0b;
+        --danger: #ef4444;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
+          Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        background: radial-gradient(900px 400px at 10% 0%, rgba(124, 58, 237, 0.25), transparent),
+          radial-gradient(900px 400px at 90% 0%, rgba(167, 139, 250, 0.18), transparent),
+          var(--bg);
+        color: var(--text);
+      }
+
+      .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 28px 18px 60px;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .brand {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .brand h1 {
+        font-size: 18px;
+        margin: 0;
+        font-weight: 750;
+        letter-spacing: 0.2px;
+      }
+
+      .brand p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .chip {
+        font-size: 12px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        background: rgba(18, 24, 38, 0.6);
+        white-space: nowrap;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+      }
+
+      @media (min-width: 860px) {
+        .grid {
+          grid-template-columns: 1.1fr 0.9fr;
+        }
+      }
+
+      .card {
+        border: 1px solid var(--border);
+        background: linear-gradient(180deg, rgba(18, 24, 38, 0.75), rgba(15, 21, 34, 0.9));
+        border-radius: 14px;
+        padding: 16px;
+        box-shadow: 0 10px 35px rgba(0, 0, 0, 0.25);
+      }
+
+      .card h2 {
+        margin: 0 0 10px;
+        font-size: 14px;
+        color: var(--muted);
+        font-weight: 650;
+      }
+
+      .row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      input[type="file"] {
+        width: 100%;
+        color: var(--muted);
+      }
+
+      .btn {
+        appearance: none;
+        border: 0;
+        background: linear-gradient(135deg, var(--primary), var(--primary-2));
+        color: white;
+        padding: 10px 14px;
+        border-radius: 12px;
+        font-weight: 650;
+        cursor: pointer;
+        transition: transform 0.06s ease, filter 0.15s ease;
+      }
+
+      .btn:hover {
+        filter: brightness(1.05);
+      }
+
+      .btn:active {
+        transform: translateY(1px);
+      }
+
+      .btn.secondary {
+        background: rgba(124, 58, 237, 0.14);
+        border: 1px solid rgba(167, 139, 250, 0.25);
+        color: var(--primary-2);
+      }
+
+      .btn:disabled {
+        cursor: not-allowed;
+        opacity: 0.75;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      @media (min-width: 560px) {
+        .stats {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+      }
+
+      .stat {
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: rgba(15, 21, 34, 0.65);
+      }
+
+      .stat .k {
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 6px;
+      }
+
+      .stat .v {
+        font-size: 18px;
+        font-weight: 800;
+      }
+
+      .charts {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      @media (min-width: 860px) {
+        .charts {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .chart-box {
+        border: 1px solid var(--border);
+        background: rgba(15, 21, 34, 0.55);
+        border-radius: 14px;
+        padding: 12px;
+      }
+
+      .chart-box h3 {
+        margin: 0 0 8px;
+        font-size: 13px;
+        font-weight: 650;
+        color: var(--muted);
+      }
+
+      .note {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 10px;
+        line-height: 1.45;
+      }
+
+      .divider {
+        height: 1px;
+        background: var(--border);
+        margin: 14px 0;
+      }
+
+      .ai-topics {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--text);
+      }
+
+      .ai-error {
+        border: 1px solid rgba(239, 68, 68, 0.35);
+        background: rgba(239, 68, 68, 0.12);
+        padding: 10px 12px;
+        border-radius: 12px;
+        color: #fecaca;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      .toast {
+        border: 1px solid rgba(245, 158, 11, 0.35);
+        background: rgba(245, 158, 11, 0.12);
+        padding: 10px 12px;
+        border-radius: 12px;
+        color: #fde68a;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        z-index: 999;
+      }
+
+      .overlay .panel {
+        width: 100%;
+        max-width: 520px;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        background: rgba(18, 24, 38, 0.92);
+        box-shadow: 0 20px 70px rgba(0, 0, 0, 0.6);
+        padding: 18px;
+      }
+
+      .spinner {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        border: 3px solid rgba(167, 139, 250, 0.25);
+        border-top-color: rgba(167, 139, 250, 0.95);
+        animation: spin 0.9s linear infinite;
+        margin-bottom: 10px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .overlay h2 {
+        margin: 0 0 6px;
+        font-size: 16px;
+      }
+
+      .overlay p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      footer {
+        margin-top: 16px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
+      canvas {
+        max-height: 320px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div class="brand">
+          <h1>WhatsApp Chat Analyser</h1>
+          <p>Upload a WhatsApp export, get stats + AI vibe summary.</p>
+        </div>
+        <div class="chip">Python + Flask • Chart.js • OpenRouter AI</div>
+      </header>
+
+      <div id="uploadError" class="ai-error hidden" style="margin-bottom: 14px;"></div>
+
+      <div id="uploadSection" class="grid">
+        <div class="card">
+          <h2>Upload</h2>
+          <form id="uploadForm">
+            <div class="row">
+              <input
+                type="file"
+                id="fileInput"
+                name="file"
+                accept=".txt,text/plain"
+                required
+              />
+            </div>
+            <div class="note">
+              WhatsApp export format usually looks like:
+              <code>DD/MM/YYYY, HH:MM - Name: message</code>
+            </div>
+            <div class="divider"></div>
+            <div class="row">
+              <button id="analyzeBtn" class="btn" type="submit">Analyse chat</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h2>What you’ll get</h2>
+          <div class="note">
+            <div><b>Stats</b>: messages per sender, per hour, daily trend, and most-used words.</div>
+            <div style="margin-top: 10px;"><b>AI</b>: overall vibe summary, top 3 topics, and one funny observation.</div>
+          </div>
+          <div class="divider"></div>
+          <div class="toast">
+            For the AI summary, set <code>OPENROUTER_API_KEY</code> in <code>.env</code>.
+          </div>
+        </div>
+      </div>
+
+      <div id="resultsSection" class="hidden">
+        <div class="card" style="margin-bottom: 14px;">
+          <h2>Results</h2>
+          <div class="stats">
+            <div class="stat">
+              <div class="k">Total messages</div>
+              <div id="statTotal" class="v">-</div>
+            </div>
+            <div class="stat">
+              <div class="k">Unique senders</div>
+              <div id="statSenders" class="v">-</div>
+            </div>
+            <div class="stat">
+              <div class="k">Top topic words</div>
+              <div id="statTopWords" class="v">-</div>
+            </div>
+            <div class="stat">
+              <div class="k">AI summary</div>
+              <div id="statAI" class="v">-</div>
+            </div>
+          </div>
+          <div class="divider"></div>
+          <div class="row">
+            <button id="backBtn" class="btn secondary" type="button">Analyse another file</button>
+          </div>
+        </div>
+
+        <div class="grid" style="align-items: start;">
+          <div class="charts">
+            <div class="chart-box">
+              <h3>Messages per sender (top)</h3>
+              <canvas id="sendersChart"></canvas>
+            </div>
+            <div class="chart-box">
+              <h3>Messages per hour of day</h3>
+              <canvas id="hoursChart"></canvas>
+            </div>
+            <div class="chart-box">
+              <h3>Messages over time (daily)</h3>
+              <canvas id="daysChart"></canvas>
+            </div>
+            <div class="chart-box">
+              <h3>Most used words (top)</h3>
+              <canvas id="wordsChart"></canvas>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>AI summary</h2>
+            <div id="aiError" class="ai-error hidden"></div>
+            <div id="aiContent" class="hidden">
+              <div style="color: var(--text); font-weight: 750; margin-bottom: 8px;">
+                Overall vibe
+              </div>
+              <div id="aiVibe" style="color: var(--text); line-height: 1.5; margin-bottom: 12px;"></div>
+
+              <div style="color: var(--text); font-weight: 750; margin-bottom: 8px;">
+                Top recurring topics
+              </div>
+              <ul id="aiTopics" class="ai-topics"></ul>
+
+              <div class="divider"></div>
+              <div style="color: var(--text); font-weight: 750; margin-bottom: 8px;">
+                Funny observation
+              </div>
+              <div id="aiFunny" style="color: var(--text); line-height: 1.5;"></div>
+            </div>
+            <div id="aiFallback" class="note"></div>
+          </div>
+        </div>
+
+        <footer>
+          Tip: your chat’s export locale can affect parsing. If stats look off, try re-exporting from WhatsApp or confirm the line format.
+        </footer>
+      </div>
+    </div>
+
+    <div id="overlay" class="overlay hidden" aria-live="polite">
+      <div class="panel">
+        <div class="spinner"></div>
+        <h2>Analysing…</h2>
+        <p id="overlayText">Parsing + computing stats + asking AI.</p>
+      </div>
+    </div>
+
+    <script>
+      const uploadSection = document.getElementById('uploadSection');
+      const resultsSection = document.getElementById('resultsSection');
+      const overlay = document.getElementById('overlay');
+      const analyzeBtn = document.getElementById('analyzeBtn');
+      const fileInput = document.getElementById('fileInput');
+
+      const aiError = document.getElementById('aiError');
+      const aiContent = document.getElementById('aiContent');
+      const aiFallback = document.getElementById('aiFallback');
+      const aiVibe = document.getElementById('aiVibe');
+      const aiTopics = document.getElementById('aiTopics');
+      const aiFunny = document.getElementById('aiFunny');
+
+      const statTotal = document.getElementById('statTotal');
+      const statSenders = document.getElementById('statSenders');
+      const statTopWords = document.getElementById('statTopWords');
+      const statAI = document.getElementById('statAI');
+
+      let sendersChart = null;
+      let hoursChart = null;
+      let daysChart = null;
+      let wordsChart = null;
+
+      function showOverlay() {
+        overlay.classList.remove('hidden');
+        analyzeBtn.disabled = true;
+      }
+
+      function hideOverlay() {
+        overlay.classList.add('hidden');
+        analyzeBtn.disabled = false;
+      }
+
+      function baseChartOptions() {
+        return {
+          plugins: {
+            legend: { labels: { color: '#9aa4b2' } },
+            tooltip: {
+              backgroundColor: 'rgba(18,24,38,0.98)',
+              titleColor: '#e6edf3',
+              bodyColor: '#e6edf3',
+              borderColor: 'rgba(255,255,255,0.1)',
+              borderWidth: 1
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#9aa4b2' },
+              grid: { color: 'rgba(255,255,255,0.06)' }
+            },
+            y: {
+              ticks: { color: '#9aa4b2' },
+              grid: { color: 'rgba(255,255,255,0.06)' },
+              beginAtZero: true
+            }
+          }
+        };
+      }
+
+      function destroyCharts() {
+        for (const c of [sendersChart, hoursChart, daysChart, wordsChart]) {
+          if (c) c.destroy();
+        }
+        sendersChart = null;
+        hoursChart = null;
+        daysChart = null;
+        wordsChart = null;
+      }
+
+      function renderCharts(stats) {
+        destroyCharts();
+
+        const sendersCtx = document.getElementById('sendersChart').getContext('2d');
+        const hoursCtx = document.getElementById('hoursChart').getContext('2d');
+        const daysCtx = document.getElementById('daysChart').getContext('2d');
+        const wordsCtx = document.getElementById('wordsChart').getContext('2d');
+
+        const senders = stats.senders || { labels: [], counts: [] };
+        sendersChart = new Chart(sendersCtx, {
+          type: 'bar',
+          data: {
+            labels: senders.labels,
+            datasets: [{
+              label: 'Messages',
+              data: senders.counts,
+              backgroundColor: 'rgba(124, 58, 237, 0.55)',
+              borderColor: 'rgba(167, 139, 250, 0.9)',
+              borderWidth: 1
+            }]
+          },
+          options: baseChartOptions()
+        });
+
+        const hours = stats.hours || { labels: [], counts: [] };
+        hoursChart = new Chart(hoursCtx, {
+          type: 'bar',
+          data: {
+            labels: hours.labels,
+            datasets: [{
+              label: 'Messages',
+              data: hours.counts,
+              backgroundColor: 'rgba(167, 139, 250, 0.35)',
+              borderColor: 'rgba(167, 139, 250, 0.95)',
+              borderWidth: 1
+            }]
+          },
+          options: baseChartOptions()
+        });
+
+        const days = stats.days || { labels: [], counts: [] };
+        daysChart = new Chart(daysCtx, {
+          type: 'line',
+          data: {
+            labels: days.labels,
+            datasets: [{
+              label: 'Messages per day',
+              data: days.counts,
+              fill: true,
+              backgroundColor: 'rgba(124, 58, 237, 0.12)',
+              borderColor: 'rgba(124, 58, 237, 0.95)',
+              pointRadius: 2
+            }]
+          },
+          options: {
+            ...baseChartOptions(),
+            plugins: {
+              ...baseChartOptions().plugins,
+              legend: { labels: { color: '#9aa4b2' } }
+            }
+          }
+        });
+
+        const words = stats.top_words || [];
+        const wordLabels = words.slice(0, 10).map(x => x.word);
+        const wordCounts = words.slice(0, 10).map(x => x.count);
+        wordsChart = new Chart(wordsCtx, {
+          type: 'bar',
+          data: {
+            labels: wordLabels,
+            datasets: [{
+              label: 'Uses',
+              data: wordCounts,
+              backgroundColor: 'rgba(34, 197, 94, 0.25)',
+              borderColor: 'rgba(34, 197, 94, 0.95)',
+              borderWidth: 1
+            }]
+          },
+          options: baseChartOptions()
+        });
+      }
+
+      function renderAI(ai) {
+        aiError.classList.add('hidden');
+        aiContent.classList.add('hidden');
+        aiFallback.textContent = '';
+
+        const err = ai && ai.error;
+        if (err) {
+          aiError.textContent = 'AI summary unavailable: ' + err;
+          aiError.classList.remove('hidden');
+          return;
+        }
+
+        const vibe = ai.vibe_summary || '';
+        const topics = ai.top_3_topics || [];
+        const funny = ai.funny_observation || '';
+        const raw = ai.raw || '';
+
+        aiVibe.textContent = vibe || (raw ? '' : 'No summary returned.');
+        aiTopics.innerHTML = '';
+        if (topics.length === 0) {
+          const li = document.createElement('li');
+          li.textContent = raw ? '' : 'No topics returned.';
+          aiTopics.appendChild(li);
+        } else {
+          topics.forEach(t => {
+            const li = document.createElement('li');
+            li.textContent = t;
+            aiTopics.appendChild(li);
+          });
+        }
+        aiFunny.textContent = funny || (raw ? '' : 'No funny observation returned.');
+
+        const hasAny = vibe || topics.length > 0 || funny;
+        if (raw && !hasAny) {
+          aiFallback.textContent = raw;
+          aiFallback.style.display = 'block';
+        } else if (!hasAny) {
+          aiFallback.textContent = 'The AI returned no content. Try again or add OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct:free to .env when not rate-limited.';
+          aiFallback.style.display = 'block';
+        } else {
+          aiFallback.textContent = '';
+          aiFallback.style.display = 'none';
+        }
+
+        aiContent.classList.remove('hidden');
+      }
+
+      document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const fd = new FormData();
+        fd.append('file', fileInput.files[0]);
+
+        const fileSize = fileInput.files[0]?.size || 0;
+        const isLarge = fileSize > 1024 * 1024; // > 1MB
+        document.getElementById('overlayText').textContent = isLarge
+          ? 'Large file — parsing and computing stats. This may take 30–60 seconds…'
+          : 'Parsing + computing stats + asking AI.';
+
+        document.getElementById('uploadError').classList.add('hidden');
+        showOverlay();
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 min
+
+        try {
+          const res = await fetch('/analyze', { method: 'POST', body: fd, signal: controller.signal });
+          clearTimeout(timeout);
+
+          let data;
+          try {
+            data = await res.json();
+          } catch (_) {
+            throw new Error(res.ok ? 'Invalid server response' : `Server error (${res.status}). Large files can take a while — try again.`);
+          }
+
+          if (!res.ok) {
+            throw new Error(data.error || 'Analysis failed');
+          }
+
+          const stats = data.stats || {};
+          const ai = data.ai || {};
+
+          statTotal.textContent = stats.total_messages ?? '-';
+          statSenders.textContent = stats.unique_senders ?? '-';
+          statTopWords.textContent = (stats.top_words || []).length;
+          statAI.textContent = ai && !ai.error ? 'Ready' : 'N/A';
+
+          renderCharts(stats);
+          renderAI(ai);
+
+          uploadSection.classList.add('hidden');
+          resultsSection.classList.remove('hidden');
+        } catch (err) {
+          clearTimeout(timeout);
+          const uploadError = document.getElementById('uploadError');
+          const msg = err.name === 'AbortError' ? 'Request timed out after 5 minutes. Large files can take a while — try again or use a smaller export.' : err.message;
+          uploadError.textContent = 'Error: ' + msg;
+          uploadError.classList.remove('hidden');
+          uploadSection.classList.remove('hidden');
+          resultsSection.classList.add('hidden');
+        } finally {
+          clearTimeout(timeout);
+          hideOverlay();
+        }
+      });
+
+      document.getElementById('backBtn').addEventListener('click', () => {
+        destroyCharts();
+        resultsSection.classList.add('hidden');
+        uploadSection.classList.remove('hidden');
+        document.getElementById('uploadError').classList.add('hidden');
+        aiError.classList.add('hidden');
+        aiContent.classList.add('hidden');
+        aiFallback.textContent = '';
+        fileInput.value = '';
+      });
+    </script>
+  </body>
+</html>
+

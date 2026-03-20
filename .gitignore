@@ -1,0 +1,21 @@
+# Python virtual environment
+venv/
+.venv/
+
+# Python cache/build
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Environment variables
+.env
+
+# Local chat exports / temp files
+temp_whatsapp_export.txt
+WhatsApp Chat with Pavithraa.txt
+
+# Editor/OS
+.vscode/
+.DS_Store
