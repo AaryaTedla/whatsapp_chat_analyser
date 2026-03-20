@@ -302,7 +302,7 @@ def _local_fallback_summary(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
     while len(topics) < 3:
         topics.append(["updates", "planning", "check-ins"][len(topics)])
 
-    coordination_hits = sum(1 for w in ["tomorrow", "check", "on", "it", "brb", "done", "fixed"] if w in joined)
+    coordination_hits = sum(1 for w in ["tomorrow", "check", "brb", "done", "fixed", "deploy", "release"] if w in joined)
     tone_parts = []
     if short_count >= max(3, len(text_lines) // 2):
         tone_parts.append("The conversation is fast-paced with lots of short check-ins")
@@ -320,7 +320,26 @@ def _local_fallback_summary(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
         vibe += "."
     vibe += f" There are {unique_senders or 'multiple'} active participants, which keeps the chat collaborative."
 
-    funny = "Half the messages read like mission-control status pings: 'On it', 'Brb', and 'Tomorrow?' in rapid succession."
+    # Build a light observation from actual short lines to avoid fake phrases.
+    short_examples: List[str] = []
+    seen = set()
+    for line in text_lines:
+        cleaned = line.strip()
+        if not cleaned:
+            continue
+        if len(cleaned.split()) <= 4 and len(cleaned) <= 40:
+            key = cleaned.lower()
+            if key not in seen:
+                seen.add(key)
+                short_examples.append(cleaned)
+        if len(short_examples) >= 3:
+            break
+
+    if short_examples:
+        quoted = ", ".join(f"'{x}'" for x in short_examples[:3])
+        funny = f"The chat has quick status-update energy, with rapid one-liners like {quoted}."
+    else:
+        funny = "The conversation keeps a brisk rhythm with concise updates and quick handoffs."
 
     return {
         "vibe_summary": vibe,
