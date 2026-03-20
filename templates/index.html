@@ -214,6 +214,16 @@
         line-height: 1.45;
       }
 
+      .report-link {
+        margin-top: 10px;
+        font-size: 13px;
+      }
+
+      .report-link a {
+        color: #c4b5fd;
+        text-decoration: none;
+      }
+
       .divider {
         height: 1px;
         background: var(--border);
@@ -384,6 +394,7 @@
           <div class="row">
             <button id="backBtn" class="btn secondary" type="button">Analyse another file</button>
           </div>
+          <div id="reportLink" class="report-link hidden"></div>
         </div>
 
         <div class="grid" style="align-items: start;">
@@ -462,6 +473,7 @@
       const statSenders = document.getElementById('statSenders');
       const statTopWords = document.getElementById('statTopWords');
       const statAI = document.getElementById('statAI');
+      const reportLink = document.getElementById('reportLink');
 
       let sendersChart = null;
       let hoursChart = null;
@@ -677,6 +689,7 @@
 
           const stats = data.stats || {};
           const ai = data.ai || {};
+          const reportId = data.report_id;
 
           statTotal.textContent = stats.total_messages ?? '-';
           statSenders.textContent = stats.unique_senders ?? '-';
@@ -685,6 +698,14 @@
 
           renderCharts(stats);
           renderAI(ai);
+
+          if (reportId) {
+            reportLink.innerHTML = `Saved report #${reportId}: <a href="/reports/${reportId}/view">Open report</a> · <a href="/reports/${reportId}/txt">Download TXT</a>`;
+            reportLink.classList.remove('hidden');
+          } else {
+            reportLink.innerHTML = '';
+            reportLink.classList.add('hidden');
+          }
 
           uploadSection.classList.add('hidden');
           resultsSection.classList.remove('hidden');
@@ -710,6 +731,8 @@
         aiError.classList.add('hidden');
         aiContent.classList.add('hidden');
         aiFallback.textContent = '';
+        reportLink.innerHTML = '';
+        reportLink.classList.add('hidden');
         fileInput.value = '';
       });
     </script>

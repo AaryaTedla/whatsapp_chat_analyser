@@ -19,7 +19,7 @@ app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024  # 20MB
 
 DB_PATH = os.getenv(
     "DB_PATH",
-    os.path.join(os.path.dirname(__file__), "instance", "lumira_reports.db"),
+    "/tmp/lumira_reports.db",
 )
 
 
@@ -151,6 +151,14 @@ def get_report(report_id: int):
     if not report:
         return jsonify({"error": "Report not found"}), 404
     return jsonify(report)
+
+
+@app.route("/reports/<int:report_id>/view", methods=["GET"])
+def view_report(report_id: int):
+    report = _fetch_report(report_id)
+    if not report:
+        return "Report not found", 404
+    return render_template("report_view.html", report=report)
 
 
 @app.route("/reports/<int:report_id>/txt", methods=["GET"])

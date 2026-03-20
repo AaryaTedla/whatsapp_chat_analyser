@@ -100,6 +100,12 @@
         font-size: 14px;
         padding: 6px 2px;
       }
+
+      .warn {
+        margin-top: 10px;
+        color: #fde68a;
+        font-size: 12px;
+      }
     </style>
   </head>
   <body>
@@ -157,6 +163,7 @@
             <td>${r.message_count}</td>
             <td>
               <div class="actions">
+                <a class="link" href="/reports/${r.id}/view">Open</a>
                 <a class="link" href="/reports/${r.id}" target="_blank" rel="noopener">JSON</a>
                 <a class="link" href="/reports/${r.id}/txt">TXT</a>
               </div>
@@ -168,5 +175,6 @@
 
       loadReports();
     </script>
+    <p class="warn">Free Render without disk uses temporary storage; reports can reset after redeploy/restart.</p>
   </body>
 </html>
