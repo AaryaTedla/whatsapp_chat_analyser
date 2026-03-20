@@ -52,10 +52,21 @@ Create `.env` with:
 
 ```env
 OPENROUTER_API_KEY=your_key_here
-OPENROUTER_MODEL=stepfun/step-3.5-flash:free
+OPENROUTER_MODEL=google/gemma-3-4b-it:free
 # Optional override:
 # DB_PATH=/tmp/lumira_reports.db
 ```
+
+If `OPENROUTER_MODEL` is not set, the app defaults to `google/gemma-3-4b-it:free`.
+
+### AI Summary Behavior
+
+- The app first attempts a structured AI JSON summary.
+- If the model output is invalid/placeholder-like, it retries once.
+- If still unusable, it falls back to a local summary heuristic.
+- Terminal logs show which path was used:
+  - `REAL AI SUMMARY RETURNED`
+  - `USING LOCAL FALLBACK ...`
 
 ## Render Deployment
 
@@ -64,11 +75,12 @@ OPENROUTER_MODEL=stepfun/step-3.5-flash:free
 - Env vars:
   - `OPENROUTER_API_KEY`
   - `OPENROUTER_MODEL`
-  - `DB_PATH=/tmp/lumira_reports.db` (free tier)
+  - `DB_PATH=/tmp/lumira_reports.db` (default/free-tier-friendly)
 
 ### Free Tier Note
 
 Render free instances do not provide persistent disk. Reports stored in SQLite may reset after restart/redeploy.
+This is expected when using `/tmp/lumira_reports.db`.
 
 ## Routes
 
@@ -77,8 +89,9 @@ Render free instances do not provide persistent disk. Reports stored in SQLite m
 - `/reports?format=json` - reports API list
 - `/reports/<id>` - report JSON
 - `/r/<id>` - report HTML view
+- `/reports/<id>/view` - legacy redirect to `/r/<id>`
 - `/reports/<id>/txt` - download original TXT
 
 ## Demo Test File
 
-Use `temp_whatsapp_export_50.txt` for a quick test with 50 messages.
+Use `temp_whatsapp_export.txt` for a quick test.
