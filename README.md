@@ -37,7 +37,7 @@ Live demo: `https://whatsapp-chat-analyser-d6zh.onrender.com`
 ## Local Setup
 
 ```bash
-cd lumira_prep
+cd parent_folder
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
