@@ -12,9 +12,12 @@ __pycache__/
 # Environment variables
 .env
 
+# Local runtime database
+instance/
+*.db
+
 # Local chat exports / temp files
 temp_whatsapp_export.txt
-WhatsApp Chat with Pavithraa.txt
 
 # Editor/OS
 .vscode/

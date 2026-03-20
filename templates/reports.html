@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Saved Reports - Lumira</title>
+    <style>
+      :root {
+        --bg: #0b0f14;
+        --panel: #121826;
+        --text: #e6edf3;
+        --muted: #9aa4b2;
+        --border: rgba(255, 255, 255, 0.08);
+        --primary: #7c3aed;
+        --primary2: #a78bfa;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        color: var(--text);
+        background: radial-gradient(900px 400px at 10% 0%, rgba(124, 58, 237, 0.22), transparent),
+          radial-gradient(900px 400px at 90% 0%, rgba(167, 139, 250, 0.16), transparent), var(--bg);
+      }
+
+      .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 24px 16px 60px;
+      }
+
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+
+      .btn {
+        display: inline-block;
+        text-decoration: none;
+        background: linear-gradient(135deg, var(--primary), var(--primary2));
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 10px;
+        font-weight: 650;
+        font-size: 13px;
+      }
+
+      .card {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 12px;
+        background: rgba(18, 24, 38, 0.82);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th, td {
+        text-align: left;
+        padding: 10px 8px;
+        border-bottom: 1px solid var(--border);
+        font-size: 14px;
+      }
+
+      th {
+        color: var(--muted);
+        font-weight: 650;
+        font-size: 12px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .small {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .link {
+        color: #c4b5fd;
+        text-decoration: none;
+      }
+
+      .empty {
+        color: var(--muted);
+        font-size: 14px;
+        padding: 6px 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="top">
+        <h1>Saved Reports</h1>
+        <a class="btn" href="/">Back to Analyzer</a>
+      </div>
+
+      <div class="card">
+        <div id="empty" class="empty" style="display: none;">No reports saved yet. Upload a chat on the main page first.</div>
+        <table id="table" style="display: none;">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>File</th>
+              <th>Uploaded</th>
+              <th>Messages</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+
+      <p class="small" style="margin-top: 10px;">Tip: open <code>/reports?format=json</code> for API output.</p>
+    </div>
+
+    <script>
+      async function loadReports() {
+        const res = await fetch('/reports?format=json');
+        const data = await res.json();
+        const reports = data.reports || [];
+
+        const empty = document.getElementById('empty');
+        const table = document.getElementById('table');
+        const rows = document.getElementById('rows');
+
+        if (!reports.length) {
+          empty.style.display = 'block';
+          table.style.display = 'none';
+          return;
+        }
+
+        empty.style.display = 'none';
+        table.style.display = 'table';
+
+        for (const r of reports) {
+          const tr = document.createElement('tr');
+          const uploaded = new Date(r.uploaded_at).toLocaleString();
+          tr.innerHTML = `
+            <td>${r.id}</td>
+            <td>${r.filename}</td>
+            <td>${uploaded}</td>
+            <td>${r.message_count}</td>
+            <td>
+              <div class="actions">
+                <a class="link" href="/reports/${r.id}" target="_blank" rel="noopener">JSON</a>
+                <a class="link" href="/reports/${r.id}/txt">TXT</a>
+              </div>
+            </td>
+          `;
+          rows.appendChild(tr);
+        }
+      }
+
+      loadReports();
+    </script>
+  </body>
+</html>
