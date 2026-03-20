@@ -95,6 +95,24 @@ STOP_WORDS = {
     "amp",
 }
 
+# Additional filler words to suppress noisy fallback topics.
+FALLBACK_TOPIC_STOP_WORDS = {
+    "yes",
+    "now",
+    "one",
+    "today",
+    "tomorrow",
+    "really",
+    "thing",
+    "things",
+    "good",
+    "great",
+    "nice",
+    "work",
+    "team",
+    "morning",
+}
+
 WORD_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9']+")
 
 
@@ -297,7 +315,13 @@ def _local_fallback_summary(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
     tokens: List[str] = []
     for line in text_lines:
         tokens.extend(WORD_RE.findall(line.lower()))
-    filtered = [t for t in tokens if t not in STOP_WORDS and len(t) >= 3]
+    filtered = [
+        t
+        for t in tokens
+        if t not in STOP_WORDS
+        and t not in FALLBACK_TOPIC_STOP_WORDS
+        and len(t) >= 3
+    ]
     topics = [w for w, _ in Counter(filtered).most_common(3)]
     while len(topics) < 3:
         topics.append(["updates", "planning", "check-ins"][len(topics)])
