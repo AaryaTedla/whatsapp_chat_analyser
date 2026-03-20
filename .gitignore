@@ -18,6 +18,7 @@ instance/
 
 # Local chat exports / temp files
 temp_whatsapp_export.txt
+temp_whatsapp_export_50.txt
 
 # Editor/OS
 .vscode/

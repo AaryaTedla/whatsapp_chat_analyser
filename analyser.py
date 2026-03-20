@@ -12,8 +12,8 @@ from openai import OpenAI
 load_dotenv()
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-# Step 3.5 Flash works reliably; Llama is often rate-limited. Override in .env if needed.
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "stepfun/step-3.5-flash:free")
+# Default to Gemma 3 4B; override in .env via OPENROUTER_MODEL when needed.
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemma-3-4b-it:free")
 
 
 STOP_WORDS = {
@@ -283,6 +283,9 @@ def _is_placeholder_text(text: Optional[str]) -> bool:
         "topic1",
         "topic2",
         "topic3",
+        "...",
+        "..",
+        ".",
     }
     if t in placeholders:
         return True
@@ -415,11 +418,17 @@ def generate_ai_summary(messages: List[Dict[str, Any]], max_messages: int = 50) 
 
     sample_text = "\n".join(fmt_line(m) for m in sample)
 
-    prompt = f"""You are analyzing a WhatsApp chat. Reply in this exact JSON format (no other text):
+    prompt = f"""You are analyzing a WhatsApp chat.
 
-{{"vibe_summary": "2-4 sentences on overall tone", "top_3_topics": ["topic1", "topic2", "topic3"], "funny_observation": "one light observation"}}
+Return ONLY valid JSON with this exact shape:
+{{"vibe_summary":"...", "top_3_topics":["...","...","..."], "funny_observation":"..."}}
 
-Do not include explanations, markdown, or thinking text.
+Rules:
+1) vibe_summary: 2-4 short sentences about the overall tone.
+2) top_3_topics: exactly 3 concise topic phrases.
+3) funny_observation: one light, harmless observation grounded in the chat sample.
+4) Do NOT use placeholder words like topic1/topic2/topic3 or template phrases.
+5) No markdown, no code fences, no extra keys.
 
 Chat sample:
 {sample_text}"""
@@ -475,23 +484,44 @@ Chat sample:
 
         return ""
 
-    try:
+    def _call_model(prompt_text: str):
         try:
-            resp = client.chat.completions.create(
+            return client.chat.completions.create(
                 model=OPENROUTER_MODEL,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{"role": "user", "content": prompt_text}],
                 temperature=0.3,
                 max_tokens=512,
                 response_format={"type": "json_object"},
             )
         except Exception:
             # Some providers/models don't support response_format=json_object.
-            resp = client.chat.completions.create(
+            return client.chat.completions.create(
                 model=OPENROUTER_MODEL,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{"role": "user", "content": prompt_text}],
                 temperature=0.3,
                 max_tokens=512,
             )
+
+    def _parse_summary_fields(parsed_obj: Dict[str, Any]):
+        vibe_val = parsed_obj.get("vibe_summary") or parsed_obj.get("summary") or parsed_obj.get("overall_vibe")
+        vibe_val = str(vibe_val).strip() if vibe_val else None
+
+        topics_val = parsed_obj.get("top_3_topics") or parsed_obj.get("topics") or parsed_obj.get("main_topics")
+        if isinstance(topics_val, list):
+            topics_val = [str(t).strip() for t in topics_val[:3] if t]
+        elif isinstance(topics_val, str):
+            topics_val = [t.strip() for t in topics_val.replace(",", " ").split()[:3] if t.strip()]
+        else:
+            topics_val = []
+
+        funny_val = parsed_obj.get("funny_observation") or parsed_obj.get("funny_note") or parsed_obj.get("observation")
+        funny_val = str(funny_val).strip() if funny_val else None
+
+        return vibe_val, topics_val, funny_val
+
+    resp = None
+    try:
+        resp = _call_model(prompt)
         if not resp.choices:
             return {
                 "error": "API returned no choices",
@@ -569,23 +599,36 @@ Chat sample:
     except Exception:
         parsed = {}
 
-    vibe = (
-        parsed.get("vibe_summary") or parsed.get("summary") or parsed.get("overall_vibe")
-    )
-    vibe = str(vibe).strip() if vibe else None
-
-    topics = parsed.get("top_3_topics") or parsed.get("topics") or parsed.get("main_topics")
-    if isinstance(topics, list):
-        topics = [str(t).strip() for t in topics[:3] if t]
-    elif isinstance(topics, str):
-        topics = [t.strip() for t in topics.replace(",", " ").split()[:3] if t.strip()]
-    else:
-        topics = []
-
-    funny = parsed.get("funny_observation") or parsed.get("funny_note") or parsed.get("observation")
-    funny = str(funny).strip() if funny else None
+    vibe, topics, funny = _parse_summary_fields(parsed)
 
     if not parsed and content:
+        # One retry with stricter guidance before falling back locally.
+        try:
+            retry_prompt = (
+                prompt
+                + "\n\nImportant: your previous response was not usable JSON. "
+                + "Return only concrete JSON values from this chat sample."
+            )
+            retry_resp = _call_model(retry_prompt)
+            retry_content = ""
+            if retry_resp.choices:
+                retry_content = extract_content(retry_resp.choices[0].message)
+            retry_parsed = _extract_json_object(retry_content) or {}
+            if retry_parsed:
+                parsed = retry_parsed
+                content = retry_content or content
+                vibe, topics, funny = _parse_summary_fields(parsed)
+                print("[generate_ai_summary] REAL AI SUMMARY RETURNED (after retry)")
+                return {
+                    "vibe_summary": vibe or None,
+                    "top_3_topics": topics,
+                    "funny_observation": funny or None,
+                    "raw": content or None,
+                }
+        except Exception:
+            pass
+
+        print("[generate_ai_summary] USING LOCAL FALLBACK - AI response was not valid JSON")
         fallback = _local_fallback_summary(messages)
         fallback["raw"] = content[:400] if content else None
         fallback["note"] = "Fallback summary used because model response was not valid JSON."
@@ -593,11 +636,43 @@ Chat sample:
 
     topics_are_placeholders = bool(topics) and all(_is_placeholder_text(t) for t in topics)
     if _is_placeholder_text(vibe) or _is_placeholder_text(funny) or topics_are_placeholders:
+        # Retry once with explicit anti-placeholder instruction.
+        try:
+            retry_prompt = (
+                prompt
+                + "\n\nImportant: do NOT output placeholders like topic1/topic2/topic3 or template text. "
+                + "Use only concrete, evidence-based content from this chat sample."
+            )
+            retry_resp = _call_model(retry_prompt)
+            retry_content = ""
+            if retry_resp.choices:
+                retry_content = extract_content(retry_resp.choices[0].message)
+            retry_parsed = _extract_json_object(retry_content) or {}
+            retry_vibe, retry_topics, retry_funny = _parse_summary_fields(retry_parsed)
+            retry_topics_are_placeholders = bool(retry_topics) and all(_is_placeholder_text(t) for t in retry_topics)
+            if (
+                retry_parsed
+                and not _is_placeholder_text(retry_vibe)
+                and not _is_placeholder_text(retry_funny)
+                and not retry_topics_are_placeholders
+            ):
+                print("[generate_ai_summary] REAL AI SUMMARY RETURNED (after retry)")
+                return {
+                    "vibe_summary": retry_vibe or None,
+                    "top_3_topics": retry_topics,
+                    "funny_observation": retry_funny or None,
+                    "raw": retry_content or content or None,
+                }
+        except Exception:
+            pass
+
+        print("[generate_ai_summary] USING LOCAL FALLBACK - AI response contained placeholders")
         fallback = _local_fallback_summary(messages)
         fallback["raw"] = content[:400] if content else None
         fallback["note"] = "Fallback summary used because model returned template placeholders."
         return fallback
 
+    print("[generate_ai_summary] REAL AI SUMMARY RETURNED")
     return {
         "vibe_summary": vibe or None,
         "top_3_topics": topics,
