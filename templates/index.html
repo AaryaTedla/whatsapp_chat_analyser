@@ -3,21 +3,30 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>WhatsApp Chat Analyser</title>
+    <meta name="theme-color" content="#0c1425" />
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='36' fill='%23071423'/%3E%3Ccircle cx='90' cy='90' r='54' fill='%2327d9c1'/%3E%3C/svg%3E" />
+    <title>Lumira | WhatsApp Chat Intelligence</title>
+    <link rel="manifest" href="/static/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
       :root {
-        --bg: #0b0f14;
-        --panel: #121826;
-        --panel-2: #0f1522;
-        --text: #e6edf3;
-        --muted: #9aa4b2;
-        --border: rgba(255, 255, 255, 0.08);
-        --primary: #7c3aed;
-        --primary-2: #a78bfa;
-        --good: #22c55e;
-        --warn: #f59e0b;
-        --danger: #ef4444;
+        --bg-900: #071423;
+        --bg-800: #0e1b2f;
+        --bg-700: #12233b;
+        --panel: rgba(10, 23, 39, 0.72);
+        --panel-strong: rgba(10, 23, 39, 0.92);
+        --line: rgba(170, 199, 255, 0.2);
+        --text: #eaf3ff;
+        --muted: #90a5c3;
+        --cyan: #27d9c1;
+        --blue: #4ea4ff;
+        --amber: #f8bd63;
+        --danger: #ff7a84;
+        --ok: #37d488;
+        --shadow: 0 24px 60px rgba(0, 8, 20, 0.48);
       }
 
       * {
@@ -26,192 +35,449 @@
 
       body {
         margin: 0;
-        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
-          Arial, "Apple Color Emoji", "Segoe UI Emoji";
-        background: radial-gradient(900px 400px at 10% 0%, rgba(124, 58, 237, 0.25), transparent),
-          radial-gradient(900px 400px at 90% 0%, rgba(167, 139, 250, 0.18), transparent),
-          var(--bg);
+        min-height: 100vh;
         color: var(--text);
+        font-family: Manrope, "Segoe UI", sans-serif;
+        background:
+          radial-gradient(900px 380px at -8% -10%, rgba(39, 217, 193, 0.25), transparent 62%),
+          radial-gradient(760px 420px at 100% 0%, rgba(78, 164, 255, 0.22), transparent 64%),
+          linear-gradient(140deg, var(--bg-900), var(--bg-800) 42%, var(--bg-700));
       }
 
-      .wrap {
-        max-width: 1100px;
+      body::before,
+      body::after {
+        content: "";
+        position: fixed;
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      body::before {
+        width: 480px;
+        height: 480px;
+        left: -120px;
+        bottom: -180px;
+        background: radial-gradient(circle, rgba(39, 217, 193, 0.18), transparent 66%);
+        filter: blur(6px);
+      }
+
+      body::after {
+        width: 520px;
+        height: 520px;
+        right: -180px;
+        top: 28%;
+        background: radial-gradient(circle, rgba(78, 164, 255, 0.16), transparent 70%);
+      }
+
+      .app {
+        position: relative;
+        z-index: 1;
+        max-width: 1180px;
         margin: 0 auto;
-        padding: 28px 18px 60px;
+        padding: 26px 18px 72px;
       }
 
-      header {
+      .topbar {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 18px;
+        gap: 14px;
+        margin-bottom: 22px;
       }
 
       .brand {
         display: flex;
-        flex-direction: column;
-        gap: 4px;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .mark {
+        width: 38px;
+        height: 38px;
+        border-radius: 11px;
+        background: linear-gradient(145deg, rgba(39, 217, 193, 0.95), rgba(78, 164, 255, 0.92));
+        box-shadow: 0 8px 22px rgba(39, 217, 193, 0.28);
       }
 
       .brand h1 {
-        font-size: 18px;
         margin: 0;
-        font-weight: 750;
-        letter-spacing: 0.2px;
+        font: 700 23px/1.1 "Space Grotesk", sans-serif;
+        letter-spacing: 0.3px;
       }
 
       .brand p {
-        margin: 0;
+        margin: 4px 0 0;
         color: var(--muted);
         font-size: 13px;
       }
 
-      .chip {
-        font-size: 12px;
-        padding: 8px 10px;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        color: var(--muted);
-        background: rgba(18, 24, 38, 0.6);
-        white-space: nowrap;
+      .hero {
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        padding: 24px;
+        background: linear-gradient(160deg, rgba(8, 20, 35, 0.8), rgba(18, 34, 56, 0.9));
+        box-shadow: var(--shadow);
+        margin-bottom: 18px;
+        animation: slideIn 380ms ease;
       }
 
-      .grid {
+      @keyframes slideIn {
+        from { transform: translateY(16px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+
+      .hero-grid {
         display: grid;
         grid-template-columns: 1fr;
-        gap: 14px;
+        gap: 16px;
       }
 
-      @media (min-width: 860px) {
-        .grid {
-          grid-template-columns: 1.1fr 0.9fr;
+      @media (min-width: 920px) {
+        .hero-grid {
+          grid-template-columns: 1.15fr 0.85fr;
         }
       }
 
-      .card {
-        border: 1px solid var(--border);
-        background: linear-gradient(180deg, rgba(18, 24, 38, 0.75), rgba(15, 21, 34, 0.9));
-        border-radius: 14px;
-        padding: 16px;
-        box-shadow: 0 10px 35px rgba(0, 0, 0, 0.25);
+      .eyebrow {
+        font-size: 12px;
+        color: var(--cyan);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin-bottom: 10px;
       }
 
-      .card h2 {
-        margin: 0 0 10px;
-        font-size: 14px;
-        color: var(--muted);
-        font-weight: 650;
+      .hero h2 {
+        margin: 0;
+        font: 800 clamp(1.7rem, 1.3rem + 1.5vw, 2.7rem)/1.08 "Space Grotesk", sans-serif;
+        max-width: 22ch;
       }
 
-      .row {
+      .hero h2 span {
+        color: var(--cyan);
+      }
+
+      .hero-copy {
+        margin: 12px 0 0;
+        color: #c8d8f2;
+        line-height: 1.55;
+        font-size: 15px;
+        max-width: 56ch;
+      }
+
+      .pills {
+        margin-top: 16px;
         display: flex;
-        gap: 12px;
-        align-items: center;
         flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .pill {
+        border: 1px solid rgba(170, 199, 255, 0.22);
+        background: rgba(13, 31, 52, 0.66);
+        border-radius: 999px;
+        padding: 7px 10px;
+        color: #d9e7fd;
+        font-size: 12px;
+      }
+
+      .glass {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+        border-radius: 20px;
+      }
+
+      .sp-10 {
+        margin-top: 10px;
+      }
+
+      .mb-8 {
+        margin-bottom: 8px;
+      }
+
+      .sp-12 {
+        margin-top: 12px;
+      }
+
+      .mb-12 {
+        margin-bottom: 12px;
+      }
+
+      .overlay-title {
+        margin: 0 0 8px;
+      }
+
+      .overlay-text {
+        margin: 0;
+      }
+
+      .a11y-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      .ai-copy {
+        color: #dbe8fb;
+      }
+
+      .upload {
+        padding: 18px;
+      }
+
+      .dropzone {
+        position: relative;
+        border: 2px dashed rgba(78, 164, 255, 0.5);
+        border-radius: 16px;
+        background: linear-gradient(180deg, rgba(7, 22, 38, 0.72), rgba(8, 27, 45, 0.84));
+        padding: 32px 24px;
+        text-align: center;
+        transition: all 200ms ease;
+        cursor: pointer;
+      }
+
+      .dropzone:hover {
+        border-color: var(--cyan);
+        background: linear-gradient(180deg, rgba(7, 30, 45, 0.8), rgba(12, 32, 52, 0.88));
+      }
+
+      .dropzone.dragging {
+        border-color: var(--cyan);
+        border-width: 2px;
+        background: linear-gradient(180deg, rgba(39, 217, 193, 0.1), rgba(39, 217, 193, 0.08));
+        box-shadow: inset 0 0 0 1px rgba(39, 217, 193, 0.3), 0 0 24px rgba(39, 217, 193, 0.2);
+      }
+
+      .dropzone-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .dropzone-icon {
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(145deg, rgba(39, 217, 193, 0.15), rgba(78, 164, 255, 0.12));
+        border-radius: 12px;
+        font-size: 24px;
+      }
+
+      .dropzone-text {
+        margin: 0;
+        color: var(--text);
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .dropzone-hint {
+        margin: 0;
       }
 
       input[type="file"] {
         width: 100%;
-        color: var(--muted);
+        color: #d9e7fd;
+      }
+
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
       }
 
       .btn {
         appearance: none;
         border: 0;
-        background: linear-gradient(135deg, var(--primary), var(--primary-2));
-        color: white;
-        padding: 10px 14px;
         border-radius: 12px;
-        font-weight: 650;
+        padding: 11px 14px;
+        font-weight: 800;
+        font-family: "Space Grotesk", sans-serif;
+        letter-spacing: 0.25px;
         cursor: pointer;
-        transition: transform 0.06s ease, filter 0.15s ease;
-      }
-
-      .btn:hover {
-        filter: brightness(1.05);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: transform 120ms ease, filter 120ms ease, box-shadow 140ms ease;
       }
 
       .btn:active {
         transform: translateY(1px);
       }
 
+      .btn.primary {
+        color: #05222a;
+        background: linear-gradient(140deg, var(--cyan), #66f0de);
+        box-shadow: 0 6px 20px rgba(39, 217, 193, 0.24);
+        font-size: 15px;
+        font-weight: 700;
+        padding: 12px 22px;
+      }
+
+      .btn.primary:hover {
+        filter: brightness(1.1);
+        box-shadow: 0 12px 28px rgba(39, 217, 193, 0.32);
+        transform: translateY(-2px);
+      }
+
+      .btn.primary:active {
+        transform: translateY(0px);
+        box-shadow: 0 2px 8px rgba(39, 217, 193, 0.2);
+      }
+
       .btn.secondary {
-        background: rgba(124, 58, 237, 0.14);
-        border: 1px solid rgba(167, 139, 250, 0.25);
-        color: var(--primary-2);
+        color: #dbe8fc;
+        border: 1px solid rgba(170, 199, 255, 0.26);
+        background: rgba(10, 29, 49, 0.72);
+      }
+
+      .btn:hover {
+        filter: brightness(1.08);
       }
 
       .btn:disabled {
+        opacity: 0.6;
         cursor: not-allowed;
-        opacity: 0.75;
+      }
+
+      .upload-icon {
+        width: 18px;
+        height: 18px;
+        display: inline-block;
+      }
+
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .status {
+        margin-top: 12px;
+        border: 1px solid rgba(255, 122, 132, 0.44);
+        background: rgba(66, 13, 23, 0.68);
+        color: #ffd4d9;
+        border-radius: 12px;
+        padding: 10px 11px;
+        font-size: 13px;
+      }
+
+      .warning {
+        margin-top: 11px;
+        border: 1px solid rgba(248, 189, 99, 0.36);
+        background: rgba(65, 42, 14, 0.58);
+        color: #ffe1b1;
+        border-radius: 12px;
+        padding: 10px 11px;
+        font-size: 13px;
       }
 
       .hidden {
         display: none !important;
       }
 
+      .results {
+        animation: slideIn 340ms ease;
+      }
+
       .stats {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
+        margin-bottom: 14px;
       }
 
-      @media (min-width: 560px) {
+      @media (min-width: 700px) {
         .stats {
           grid-template-columns: repeat(4, minmax(0, 1fr));
         }
       }
 
       .stat {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--panel);
         padding: 12px;
-        border-radius: 12px;
-        border: 1px solid var(--border);
-        background: rgba(15, 21, 34, 0.65);
       }
 
-      .stat .k {
+      .stat .label {
         color: var(--muted);
         font-size: 12px;
-        margin-bottom: 6px;
       }
 
-      .stat .v {
-        font-size: 18px;
-        font-weight: 800;
+      .stat .value {
+        margin-top: 6px;
+        font: 800 1.4rem/1 "Space Grotesk", sans-serif;
       }
 
-      .charts {
+      .grid {
         display: grid;
         grid-template-columns: 1fr;
         gap: 12px;
       }
 
-      @media (min-width: 860px) {
-        .charts {
-          grid-template-columns: 1fr;
+      @media (min-width: 980px) {
+        .grid {
+          grid-template-columns: 1.2fr 0.8fr;
         }
       }
 
-      .chart-box {
-        border: 1px solid var(--border);
-        background: rgba(15, 21, 34, 0.55);
-        border-radius: 14px;
-        padding: 12px;
+      .chart-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
       }
 
-      .chart-box h3 {
-        margin: 0 0 8px;
-        font-size: 13px;
-        font-weight: 650;
-        color: var(--muted);
+      @media (min-width: 880px) {
+        .chart-grid {
+          grid-template-columns: 1fr 1fr;
+        }
       }
 
-      .note {
-        font-size: 12px;
-        color: var(--muted);
-        margin-top: 10px;
-        line-height: 1.45;
+      .chart-card,
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--panel);
+        padding: 14px;
+      }
+
+      .chart-card h3,
+      .panel h3 {
+        margin: 0 0 10px;
+        font: 700 14px/1.2 "Space Grotesk", sans-serif;
+        color: #cfe1ff;
+        letter-spacing: 0.3px;
+      }
+
+      .ai-title {
+        color: var(--cyan);
+        font: 700 12px/1.2 "Space Grotesk", sans-serif;
+        margin: 12px 0 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      .topics {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      .topics li {
+        margin-bottom: 4px;
       }
 
       .report-link {
@@ -220,296 +486,289 @@
       }
 
       .report-link a {
-        color: #c4b5fd;
-        text-decoration: none;
+        color: #98e7dc;
       }
 
-      .divider {
-        height: 1px;
-        background: var(--border);
-        margin: 14px 0;
-      }
-
-      .ai-topics {
-        margin: 0;
-        padding-left: 18px;
-        color: var(--text);
-      }
-
-      .ai-error {
-        border: 1px solid rgba(239, 68, 68, 0.35);
-        background: rgba(239, 68, 68, 0.12);
-        padding: 10px 12px;
-        border-radius: 12px;
-        color: #fecaca;
-        font-size: 13px;
-        line-height: 1.4;
-      }
-
-      .toast {
-        border: 1px solid rgba(245, 158, 11, 0.35);
-        background: rgba(245, 158, 11, 0.12);
-        padding: 10px 12px;
-        border-radius: 12px;
-        color: #fde68a;
-        font-size: 13px;
-        line-height: 1.4;
+      canvas {
+        max-height: 300px;
       }
 
       .overlay {
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.55);
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 18px;
-        z-index: 999;
+        background: rgba(2, 8, 20, 0.62);
+        z-index: 20;
       }
 
-      .overlay .panel {
-        width: 100%;
-        max-width: 520px;
-        border-radius: 16px;
-        border: 1px solid var(--border);
-        background: rgba(18, 24, 38, 0.92);
-        box-shadow: 0 20px 70px rgba(0, 0, 0, 0.6);
+      .overlay-box {
+        width: min(520px, 92vw);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--panel-strong);
         padding: 18px;
+        box-shadow: var(--shadow);
       }
 
       .spinner {
-        width: 38px;
-        height: 38px;
+        width: 34px;
+        height: 34px;
         border-radius: 50%;
-        border: 3px solid rgba(167, 139, 250, 0.25);
-        border-top-color: rgba(167, 139, 250, 0.95);
-        animation: spin 0.9s linear infinite;
+        border: 3px solid rgba(39, 217, 193, 0.3);
+        border-top-color: var(--cyan);
+        animation: spin 900ms linear infinite;
         margin-bottom: 10px;
       }
 
       @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
+        to { transform: rotate(360deg); }
       }
 
-      .overlay h2 {
-        margin: 0 0 6px;
-        font-size: 16px;
-      }
-
-      .overlay p {
-        margin: 0;
-        color: var(--muted);
-        font-size: 13px;
-        line-height: 1.4;
-      }
-
-      footer {
-        margin-top: 16px;
+      .footer {
+        margin-top: 14px;
         color: var(--muted);
         font-size: 12px;
-        line-height: 1.4;
-      }
-
-      canvas {
-        max-height: 320px;
       }
     </style>
   </head>
   <body>
-    <div class="wrap">
-      <header>
+    <main class="app">
+      <header class="topbar">
         <div class="brand">
-          <h1>WhatsApp Chat Analyser</h1>
-          <p>Upload a WhatsApp export, get stats + AI vibe summary.</p>
+          <div class="mark"></div>
+          <div>
+            <h1>Lumira</h1>
+            <p>WhatsApp chat intelligence with Polars + AI</p>
+          </div>
         </div>
-        <div class="row">
-          <a class="btn secondary" href="/reports">Saved reports</a>
-          <div class="chip">Python + Flask • Chart.js • OpenRouter AI</div>
-        </div>
+        <a href="/reports" class="btn secondary">Saved reports</a>
       </header>
 
-      <div id="uploadError" class="ai-error hidden" style="margin-bottom: 14px;"></div>
+      <section id="uploadSection" class="hero">
+        <div class="hero-grid">
+          <div>
+            <div class="eyebrow">Chat Intelligence Studio</div>
+            <h2>From raw exports to <span>clear social insight</span> in one pass.</h2>
+            <p class="hero-copy">
+              Drop your WhatsApp export and get participant behavior, time trends, topic words,
+              and a structured AI readout of the conversation vibe.
+            </p>
+            <div class="pills">
+              <span class="pill">FastAPI backend</span>
+              <span class="pill">Polars lazy analytics</span>
+              <span class="pill">PWA-ready</span>
+            </div>
+          </div>
+          <div class="glass upload">
+            <form id="uploadForm">
+              <div id="dropzone" class="dropzone">
+                <div class="dropzone-inner">
+                  <div class="dropzone-icon">📄</div>
+                  <label class="a11y-label" for="fileInput">Upload WhatsApp export file</label>
+                  <input type="file" id="fileInput" name="file" accept=".txt,text/plain" required style="display: none;" />
+                  <p class="dropzone-text">Drop your WhatsApp export here</p>
+                  <p class="muted dropzone-hint">or click to select file (.txt format)</p>
+                  <p class="muted" style="font-size: 12px; margin-top: 8px;">Expected: DD/MM/YYYY, HH:MM - Name: message</p>
+                </div>
+              </div>
+              <div class="row sp-12">
+                <button id="analyzeBtn" class="btn primary" type="submit">
+                  <span>✨</span>
+                  Analyze chat
+                </button>
+                <a class="btn secondary" href="/docs" target="_blank" rel="noopener">API docs</a>
+              </div>
+            </form>
+            <div class="warning">
+              For AI summaries, configure OPENROUTER_API_KEY in your .env file.
+            </div>
+            <div id="uploadError" class="status hidden"></div>
+          </div>
+        </div>
+      </section>
 
-      <div id="uploadSection" class="grid">
-        <div class="card">
-          <h2>Upload</h2>
-          <form id="uploadForm">
-            <div class="row">
-              <input
-                type="file"
-                id="fileInput"
-                name="file"
-                accept=".txt,text/plain"
-                required
-              />
-            </div>
-            <div class="note">
-              WhatsApp export format usually looks like:
-              <code>DD/MM/YYYY, HH:MM - Name: message</code>
-            </div>
-            <div class="divider"></div>
-            <div class="row">
-              <button id="analyzeBtn" class="btn" type="submit">Analyse chat</button>
-            </div>
-          </form>
+      <section id="resultsSection" class="results hidden">
+        <div class="stats">
+          <article class="stat">
+            <div class="label">Total messages</div>
+            <div id="statTotal" class="value">-</div>
+          </article>
+          <article class="stat">
+            <div class="label">Unique senders</div>
+            <div id="statSenders" class="value">-</div>
+          </article>
+          <article class="stat">
+            <div class="label">Tracked top words</div>
+            <div id="statTopWords" class="value">-</div>
+          </article>
+          <article class="stat">
+            <div class="label">AI summary status</div>
+            <div id="statAI" class="value">-</div>
+          </article>
         </div>
 
-        <div class="card">
-          <h2>What you’ll get</h2>
-          <div class="note">
-            <div><b>Stats</b>: messages per sender, per hour, daily trend, and most-used words.</div>
-            <div style="margin-top: 10px;"><b>AI</b>: overall vibe summary, top 3 topics, and one funny observation.</div>
-          </div>
-          <div class="divider"></div>
-          <div class="toast">
-            For the AI summary, set <code>OPENROUTER_API_KEY</code> in <code>.env</code>.
-          </div>
-        </div>
-      </div>
-
-      <div id="resultsSection" class="hidden">
-        <div class="card" style="margin-bottom: 14px;">
-          <h2>Results</h2>
-          <div class="stats">
-            <div class="stat">
-              <div class="k">Total messages</div>
-              <div id="statTotal" class="v">-</div>
-            </div>
-            <div class="stat">
-              <div class="k">Unique senders</div>
-              <div id="statSenders" class="v">-</div>
-            </div>
-            <div class="stat">
-              <div class="k">Top topic words</div>
-              <div id="statTopWords" class="v">-</div>
-            </div>
-            <div class="stat">
-              <div class="k">AI summary</div>
-              <div id="statAI" class="v">-</div>
-            </div>
-          </div>
-          <div class="divider"></div>
-          <div class="row">
-            <button id="backBtn" class="btn secondary" type="button">Analyse another file</button>
-          </div>
+        <div class="row mb-12">
+          <button id="backBtn" class="btn secondary" type="button">Analyze another file</button>
           <div id="reportLink" class="report-link hidden"></div>
         </div>
 
-        <div class="grid" style="align-items: start;">
-          <div class="charts">
-            <div class="chart-box">
-              <h3>Messages per sender (top)</h3>
+        <div class="grid">
+          <div class="chart-grid">
+            <article class="chart-card">
+              <h3>Messages by sender</h3>
               <canvas id="sendersChart"></canvas>
-            </div>
-            <div class="chart-box">
-              <h3>Messages per hour of day</h3>
+            </article>
+            <article class="chart-card">
+              <h3>Messages by hour</h3>
               <canvas id="hoursChart"></canvas>
-            </div>
-            <div class="chart-box">
-              <h3>Messages over time (daily)</h3>
+            </article>
+            <article class="chart-card">
+              <h3>Daily message volume</h3>
               <canvas id="daysChart"></canvas>
-            </div>
-            <div class="chart-box">
-              <h3>Most used words (top)</h3>
+            </article>
+            <article class="chart-card">
+              <h3>Top recurring words</h3>
               <canvas id="wordsChart"></canvas>
-            </div>
+            </article>
           </div>
 
-          <div class="card">
-            <h2>AI summary</h2>
-            <div id="aiError" class="ai-error hidden"></div>
+          <aside class="panel">
+            <h3>AI summary</h3>
+            <div id="aiError" class="status hidden"></div>
             <div id="aiContent" class="hidden">
-              <div style="color: var(--text); font-weight: 750; margin-bottom: 8px;">
-                Overall vibe
-              </div>
-              <div id="aiVibe" style="color: var(--text); line-height: 1.5; margin-bottom: 12px;"></div>
+              <div class="ai-title">Overall vibe</div>
+              <p id="aiVibe" class="muted ai-copy"></p>
 
-              <div style="color: var(--text); font-weight: 750; margin-bottom: 8px;">
-                Top recurring topics
-              </div>
-              <ul id="aiTopics" class="ai-topics"></ul>
+              <div class="ai-title">Top recurring topics</div>
+              <ul id="aiTopics" class="topics"></ul>
 
-              <div class="divider"></div>
-              <div style="color: var(--text); font-weight: 750; margin-bottom: 8px;">
-                Funny observation
-              </div>
-              <div id="aiFunny" style="color: var(--text); line-height: 1.5;"></div>
+              <div class="ai-title">Funny observation</div>
+              <p id="aiFunny" class="muted ai-copy"></p>
             </div>
-            <div id="aiFallback" class="note"></div>
-          </div>
+            <p id="aiFallback" class="muted"></p>
+          </aside>
         </div>
 
-        <footer>
-          Tip: your chat’s export locale can affect parsing. If stats look off, try re-exporting from WhatsApp or confirm the line format.
-        </footer>
-      </div>
-    </div>
+        <p class="footer">
+          Tip: if parsing looks off, re-export the WhatsApp chat in text format and try again.
+        </p>
+      </section>
+    </main>
 
     <div id="overlay" class="overlay hidden" aria-live="polite">
-      <div class="panel">
+      <div class="overlay-box">
         <div class="spinner"></div>
-        <h2>Analysing…</h2>
-        <p id="overlayText">Parsing + computing stats + asking AI.</p>
+        <h3 class="overlay-title">Analyzing conversation...</h3>
+        <p id="overlayText" class="muted overlay-text">Parsing messages, computing stats, and generating AI summary.</p>
       </div>
     </div>
 
     <script>
-      const uploadSection = document.getElementById('uploadSection');
-      const resultsSection = document.getElementById('resultsSection');
-      const overlay = document.getElementById('overlay');
-      const analyzeBtn = document.getElementById('analyzeBtn');
-      const fileInput = document.getElementById('fileInput');
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/static/service-worker.js").catch(() => {});
+        });
+      }
 
-      const aiError = document.getElementById('aiError');
-      const aiContent = document.getElementById('aiContent');
-      const aiFallback = document.getElementById('aiFallback');
-      const aiVibe = document.getElementById('aiVibe');
-      const aiTopics = document.getElementById('aiTopics');
-      const aiFunny = document.getElementById('aiFunny');
+      const uploadSection = document.getElementById("uploadSection");
+      const resultsSection = document.getElementById("resultsSection");
+      const overlay = document.getElementById("overlay");
+      const analyzeBtn = document.getElementById("analyzeBtn");
+      const fileInput = document.getElementById("fileInput");
+      const dropzone = document.getElementById("dropzone");
 
-      const statTotal = document.getElementById('statTotal');
-      const statSenders = document.getElementById('statSenders');
-      const statTopWords = document.getElementById('statTopWords');
-      const statAI = document.getElementById('statAI');
-      const reportLink = document.getElementById('reportLink');
+      const aiError = document.getElementById("aiError");
+      const aiContent = document.getElementById("aiContent");
+      const aiFallback = document.getElementById("aiFallback");
+      const aiVibe = document.getElementById("aiVibe");
+      const aiTopics = document.getElementById("aiTopics");
+      const aiFunny = document.getElementById("aiFunny");
+
+      const statTotal = document.getElementById("statTotal");
+      const statSenders = document.getElementById("statSenders");
+      const statTopWords = document.getElementById("statTopWords");
+      const statAI = document.getElementById("statAI");
+      const reportLink = document.getElementById("reportLink");
 
       let sendersChart = null;
       let hoursChart = null;
       let daysChart = null;
       let wordsChart = null;
 
+      ["dragenter", "dragover"].forEach((evt) => {
+        dropzone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.add("dragging");
+        });
+      });
+
+      ["dragleave", "drop"].forEach((evt) => {
+        dropzone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.remove("dragging");
+        });
+      });
+
+      dropzone.addEventListener("drop", (e) => {
+        const files = e.dataTransfer?.files;
+        if (files && files.length) {
+          fileInput.files = files;
+          const fileName = files[0].name;
+          dropzone.querySelector('.dropzone-text').textContent = '✓ Ready to analyze: ' + fileName;
+          dropzone.querySelector('.dropzone-hint').textContent = 'Click the button below or drop another file';
+        }
+      });
+
+      // Allow clicking dropzone to select file
+      dropzone.addEventListener("click", (e) => {
+        if (e.target !== fileInput && !fileInput.contains(e.target)) {
+          fileInput.click();
+        }
+      });
+
+      fileInput.addEventListener("change", (e) => {
+        const files = e.target.files;
+        if (files && files.length) {
+          const fileName = files[0].name;
+          dropzone.querySelector('.dropzone-text').textContent = '✓ Ready to analyze: ' + fileName;
+          dropzone.querySelector('.dropzone-hint').textContent = 'Click the button below or drop another file';
+        }
+      });
+
       function showOverlay() {
-        overlay.classList.remove('hidden');
+        overlay.classList.remove("hidden");
         analyzeBtn.disabled = true;
       }
 
       function hideOverlay() {
-        overlay.classList.add('hidden');
+        overlay.classList.add("hidden");
         analyzeBtn.disabled = false;
       }
 
-      function baseChartOptions() {
+      function chartStyle() {
         return {
           plugins: {
-            legend: { labels: { color: '#9aa4b2' } },
+            legend: { labels: { color: "#b5c7e2" } },
             tooltip: {
-              backgroundColor: 'rgba(18,24,38,0.98)',
-              titleColor: '#e6edf3',
-              bodyColor: '#e6edf3',
-              borderColor: 'rgba(255,255,255,0.1)',
+              backgroundColor: "rgba(7, 20, 35, 0.95)",
+              titleColor: "#eaf3ff",
+              bodyColor: "#eaf3ff",
+              borderColor: "rgba(170, 199, 255, 0.2)",
               borderWidth: 1
             }
           },
           scales: {
             x: {
-              ticks: { color: '#9aa4b2' },
-              grid: { color: 'rgba(255,255,255,0.06)' }
+              ticks: { color: "#90a5c3" },
+              grid: { color: "rgba(170, 199, 255, 0.09)" }
             },
             y: {
-              ticks: { color: '#9aa4b2' },
-              grid: { color: 'rgba(255,255,255,0.06)' },
+              ticks: { color: "#90a5c3" },
+              grid: { color: "rgba(170, 199, 255, 0.09)" },
               beginAtZero: true
             }
           }
@@ -517,9 +776,9 @@
       }
 
       function destroyCharts() {
-        for (const c of [sendersChart, hoursChart, daysChart, wordsChart]) {
-          if (c) c.destroy();
-        }
+        [sendersChart, hoursChart, daysChart, wordsChart].forEach((chart) => {
+          if (chart) chart.destroy();
+        });
         sendersChart = null;
         hoursChart = null;
         daysChart = null;
@@ -529,211 +788,215 @@
       function renderCharts(stats) {
         destroyCharts();
 
-        const sendersCtx = document.getElementById('sendersChart').getContext('2d');
-        const hoursCtx = document.getElementById('hoursChart').getContext('2d');
-        const daysCtx = document.getElementById('daysChart').getContext('2d');
-        const wordsCtx = document.getElementById('wordsChart').getContext('2d');
-
         const senders = stats.senders || { labels: [], counts: [] };
-        sendersChart = new Chart(sendersCtx, {
-          type: 'bar',
+        sendersChart = new Chart(document.getElementById("sendersChart").getContext("2d"), {
+          type: "bar",
           data: {
             labels: senders.labels,
             datasets: [{
-              label: 'Messages',
+              label: "Messages",
               data: senders.counts,
-              backgroundColor: 'rgba(124, 58, 237, 0.55)',
-              borderColor: 'rgba(167, 139, 250, 0.9)',
+              backgroundColor: "rgba(39, 217, 193, 0.46)",
+              borderColor: "rgba(39, 217, 193, 0.9)",
               borderWidth: 1
             }]
           },
-          options: baseChartOptions()
+          options: chartStyle()
         });
 
         const hours = stats.hours || { labels: [], counts: [] };
-        hoursChart = new Chart(hoursCtx, {
-          type: 'bar',
+        hoursChart = new Chart(document.getElementById("hoursChart").getContext("2d"), {
+          type: "bar",
           data: {
             labels: hours.labels,
             datasets: [{
-              label: 'Messages',
+              label: "Messages",
               data: hours.counts,
-              backgroundColor: 'rgba(167, 139, 250, 0.35)',
-              borderColor: 'rgba(167, 139, 250, 0.95)',
+              backgroundColor: "rgba(78, 164, 255, 0.46)",
+              borderColor: "rgba(78, 164, 255, 0.92)",
               borderWidth: 1
             }]
           },
-          options: baseChartOptions()
+          options: chartStyle()
         });
 
         const days = stats.days || { labels: [], counts: [] };
-        daysChart = new Chart(daysCtx, {
-          type: 'line',
+        daysChart = new Chart(document.getElementById("daysChart").getContext("2d"), {
+          type: "line",
           data: {
             labels: days.labels,
             datasets: [{
-              label: 'Messages per day',
+              label: "Messages / day",
               data: days.counts,
+              borderColor: "rgba(248, 189, 99, 0.96)",
+              backgroundColor: "rgba(248, 189, 99, 0.16)",
               fill: true,
-              backgroundColor: 'rgba(124, 58, 237, 0.12)',
-              borderColor: 'rgba(124, 58, 237, 0.95)',
-              pointRadius: 2
+              pointRadius: 2,
+              tension: 0.25
             }]
           },
-          options: {
-            ...baseChartOptions(),
-            plugins: {
-              ...baseChartOptions().plugins,
-              legend: { labels: { color: '#9aa4b2' } }
-            }
-          }
+          options: chartStyle()
         });
 
-        const words = stats.top_words || [];
-        const wordLabels = words.slice(0, 10).map(x => x.word);
-        const wordCounts = words.slice(0, 10).map(x => x.count);
-        wordsChart = new Chart(wordsCtx, {
-          type: 'bar',
+        const words = (stats.top_words || []).slice(0, 10);
+        wordsChart = new Chart(document.getElementById("wordsChart").getContext("2d"), {
+          type: "bar",
           data: {
-            labels: wordLabels,
+            labels: words.map((w) => w.word),
             datasets: [{
-              label: 'Uses',
-              data: wordCounts,
-              backgroundColor: 'rgba(34, 197, 94, 0.25)',
-              borderColor: 'rgba(34, 197, 94, 0.95)',
+              label: "Uses",
+              data: words.map((w) => w.count),
+              backgroundColor: "rgba(55, 212, 136, 0.4)",
+              borderColor: "rgba(55, 212, 136, 0.95)",
               borderWidth: 1
             }]
           },
-          options: baseChartOptions()
+          options: chartStyle()
         });
       }
 
       function renderAI(ai) {
-        aiError.classList.add('hidden');
-        aiContent.classList.add('hidden');
-        aiFallback.textContent = '';
+        aiError.classList.add("hidden");
+        aiContent.classList.add("hidden");
+        aiFallback.textContent = "";
 
-        const err = ai && ai.error;
-        if (err) {
-          aiError.textContent = 'AI summary unavailable: ' + err;
-          aiError.classList.remove('hidden');
+        if (ai && ai.error) {
+          aiError.textContent = "AI summary unavailable: " + ai.error;
+          aiError.classList.remove("hidden");
           return;
         }
 
-        const vibe = ai.vibe_summary || '';
-        const topics = ai.top_3_topics || [];
-        const funny = ai.funny_observation || '';
-        const raw = ai.raw || '';
+        const vibe = ai?.vibe_summary || "";
+        const topics = ai?.top_3_topics || [];
+        const funny = ai?.funny_observation || "";
+        const raw = ai?.raw || "";
 
-        aiVibe.textContent = vibe || (raw ? '' : 'No summary returned.');
-        aiTopics.innerHTML = '';
-        if (topics.length === 0) {
-          const li = document.createElement('li');
-          li.textContent = raw ? '' : 'No topics returned.';
+        aiVibe.textContent = vibe || "No vibe summary returned.";
+        aiFunny.textContent = funny || "No funny observation returned.";
+        aiTopics.innerHTML = "";
+        if (!topics.length) {
+          const li = document.createElement("li");
+          li.textContent = "No topics returned.";
           aiTopics.appendChild(li);
         } else {
-          topics.forEach(t => {
-            const li = document.createElement('li');
-            li.textContent = t;
+          topics.forEach((topic) => {
+            const li = document.createElement("li");
+            li.textContent = topic;
             aiTopics.appendChild(li);
           });
         }
-        aiFunny.textContent = funny || (raw ? '' : 'No funny observation returned.');
 
-        const hasAny = vibe || topics.length > 0 || funny;
-        if (raw && !hasAny) {
+        if (!vibe && !topics.length && !funny && raw) {
           aiFallback.textContent = raw;
-          aiFallback.style.display = 'block';
-        } else if (!hasAny) {
-          aiFallback.textContent = 'The AI returned no content. Try again or add OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct:free to .env when not rate-limited.';
-          aiFallback.style.display = 'block';
-        } else {
-          aiFallback.textContent = '';
-          aiFallback.style.display = 'none';
         }
 
-        aiContent.classList.remove('hidden');
+        aiContent.classList.remove("hidden");
       }
 
-      document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+      document.getElementById("uploadForm").addEventListener("submit", async (e) => {
         e.preventDefault();
 
+        const selected = fileInput.files?.[0];
+        if (!selected) {
+          const uploadError = document.getElementById("uploadError");
+          uploadError.textContent = "Please select a .txt export file first.";
+          uploadError.classList.remove("hidden");
+          return;
+        }
+
         const fd = new FormData();
-        fd.append('file', fileInput.files[0]);
+        fd.append("file", selected);
 
-        const fileSize = fileInput.files[0]?.size || 0;
-        const isLarge = fileSize > 1024 * 1024; // > 1MB
-        document.getElementById('overlayText').textContent = isLarge
-          ? 'Large file — parsing and computing stats. This may take 30–60 seconds…'
-          : 'Parsing + computing stats + asking AI.';
+        document.getElementById("uploadError").classList.add("hidden");
+        document.getElementById("overlayText").textContent =
+          selected.size > 1024 * 1024
+            ? "Large file detected. Analysis can take up to a minute."
+            : "Parsing messages, computing stats, and generating AI summary.";
 
-        document.getElementById('uploadError').classList.add('hidden');
+        // Update button state
+        const originalText = analyzeBtn.innerHTML;
+        analyzeBtn.innerHTML = '<span>⏳</span> Analyzing...';
+        analyzeBtn.disabled = true;
+
         showOverlay();
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 min
+        const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000);
 
         try {
-          const res = await fetch('/analyze', { method: 'POST', body: fd, signal: controller.signal });
-          clearTimeout(timeout);
+          const res = await fetch("/api/analyze", {
+            method: "POST",
+            body: fd,
+            signal: controller.signal
+          });
 
-          let data;
-          try {
-            data = await res.json();
-          } catch (_) {
-            throw new Error(res.ok ? 'Invalid server response' : `Server error (${res.status}). Large files can take a while — try again.`);
-          }
-
+          const data = await res.json();
           if (!res.ok) {
-            throw new Error(data.error || 'Analysis failed');
+            throw new Error(data.detail || "Analysis failed.");
           }
 
           const stats = data.stats || {};
           const ai = data.ai || {};
-          const reportId = data.report_id;
+          const reportId = data.id;
 
-          statTotal.textContent = stats.total_messages ?? '-';
-          statSenders.textContent = stats.unique_senders ?? '-';
+          if (reportId) {
+            window.location.href = "/analytics/" + reportId;
+            return;
+          }
+
+          statTotal.textContent = stats.total_messages ?? "-";
+          statSenders.textContent = stats.unique_senders ?? "-";
           statTopWords.textContent = (stats.top_words || []).length;
-          statAI.textContent = ai && !ai.error ? 'Ready' : 'N/A';
+          statAI.textContent = ai && !ai.error ? "Ready" : "Fallback";
 
           renderCharts(stats);
           renderAI(ai);
 
           if (reportId) {
-            reportLink.innerHTML = `Saved report #${reportId}: <a href="/r/${reportId}">Open report</a> · <a href="/reports/${reportId}/txt">Download TXT</a>`;
-            reportLink.classList.remove('hidden');
+            reportLink.innerHTML =
+              'Saved report #' + reportId +
+              ': <a href="/r/' + reportId + '">Open report</a> | <a href="/reports/' + reportId + '/txt">Download TXT</a>';
+            reportLink.classList.remove("hidden");
           } else {
-            reportLink.innerHTML = '';
-            reportLink.classList.add('hidden');
+            reportLink.classList.add("hidden");
+            reportLink.innerHTML = "";
           }
 
-          uploadSection.classList.add('hidden');
-          resultsSection.classList.remove('hidden');
+          uploadSection.classList.add("hidden");
+          resultsSection.classList.remove("hidden");
         } catch (err) {
-          clearTimeout(timeout);
-          const uploadError = document.getElementById('uploadError');
-          const msg = err.name === 'AbortError' ? 'Request timed out after 5 minutes. Large files can take a while — try again or use a smaller export.' : err.message;
-          uploadError.textContent = 'Error: ' + msg;
-          uploadError.classList.remove('hidden');
-          uploadSection.classList.remove('hidden');
-          resultsSection.classList.add('hidden');
+          const uploadError = document.getElementById("uploadError");
+          const timeoutMsg = err.name === "AbortError" ?
+            "Request timed out after 5 minutes. Try a smaller file." :
+            err.message;
+          uploadError.textContent = "Error: " + timeoutMsg;
+          uploadError.classList.remove("hidden");
+          uploadSection.classList.remove("hidden");
+          resultsSection.classList.add("hidden");
         } finally {
           clearTimeout(timeout);
           hideOverlay();
+          // Restore button state
+          analyzeBtn.innerHTML = originalText;
+          analyzeBtn.disabled = false;
         }
       });
 
-      document.getElementById('backBtn').addEventListener('click', () => {
+      document.getElementById("backBtn").addEventListener("click", () => {
         destroyCharts();
-        resultsSection.classList.add('hidden');
-        uploadSection.classList.remove('hidden');
-        document.getElementById('uploadError').classList.add('hidden');
-        aiError.classList.add('hidden');
-        aiContent.classList.add('hidden');
-        aiFallback.textContent = '';
-        reportLink.innerHTML = '';
-        reportLink.classList.add('hidden');
-        fileInput.value = '';
+        fileInput.value = "";
+        document.getElementById("uploadError").classList.add("hidden");
+        aiError.classList.add("hidden");
+        aiContent.classList.add("hidden");
+        aiFallback.textContent = "";
+        reportLink.classList.add("hidden");
+        reportLink.innerHTML = "";
+        resultsSection.classList.add("hidden");
+        
+        // Reset dropzone text
+        dropzone.querySelector('.dropzone-text').textContent = 'Drop your WhatsApp export here';
+        dropzone.querySelector('.dropzone-hint').textContent = 'or click to select file (.txt format)';
+        
+        uploadSection.classList.remove("hidden");
       });
     </script>
   </body>

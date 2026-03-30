@@ -1,5 +1,9 @@
-flask
-pandas
-python-dotenv
-openai
-gunicorn
+fastapi==0.115.0
+uvicorn==0.31.0
+sqlalchemy==2.0.35
+polars==1.39.3
+python-dotenv==1.0.1
+openai==1.57.0
+pydantic==2.9.2
+python-multipart==0.0.6
+reportlab==4.4.10

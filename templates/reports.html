@@ -3,178 +3,254 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Saved Reports - Lumira</title>
+    <title>Saved Reports | Lumira</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet" />
     <style>
       :root {
-        --bg: #0b0f14;
-        --panel: #121826;
-        --text: #e6edf3;
-        --muted: #9aa4b2;
-        --border: rgba(255, 255, 255, 0.08);
-        --primary: #7c3aed;
-        --primary2: #a78bfa;
+        --bg-900: #071423;
+        --bg-800: #0e1b2f;
+        --panel: rgba(10, 23, 39, 0.8);
+        --line: rgba(170, 199, 255, 0.2);
+        --text: #eaf3ff;
+        --muted: #90a5c3;
+        --cyan: #27d9c1;
+        --blue: #4ea4ff;
       }
 
       * { box-sizing: border-box; }
 
       body {
         margin: 0;
-        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        min-height: 100vh;
         color: var(--text);
-        background: radial-gradient(900px 400px at 10% 0%, rgba(124, 58, 237, 0.22), transparent),
-          radial-gradient(900px 400px at 90% 0%, rgba(167, 139, 250, 0.16), transparent), var(--bg);
+        font-family: Manrope, "Segoe UI", sans-serif;
+        background:
+          radial-gradient(820px 340px at 0 0, rgba(39, 217, 193, 0.2), transparent 62%),
+          radial-gradient(700px 300px at 100% 2%, rgba(78, 164, 255, 0.2), transparent 65%),
+          linear-gradient(145deg, var(--bg-900), var(--bg-800));
       }
 
       .wrap {
-        max-width: 980px;
+        max-width: 1120px;
         margin: 0 auto;
-        padding: 24px 16px 60px;
+        padding: 24px 16px 68px;
       }
 
       .top {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
+        flex-wrap: wrap;
         margin-bottom: 14px;
       }
 
       h1 {
         margin: 0;
-        font-size: 20px;
+        font: 700 30px/1.1 "Space Grotesk", sans-serif;
       }
 
-      .btn {
-        display: inline-block;
-        text-decoration: none;
-        background: linear-gradient(135deg, var(--primary), var(--primary2));
-        color: #fff;
-        padding: 8px 12px;
-        border-radius: 10px;
-        font-weight: 650;
-        font-size: 13px;
-      }
-
-      .card {
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        padding: 12px;
-        background: rgba(18, 24, 38, 0.82);
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-
-      th, td {
-        text-align: left;
-        padding: 10px 8px;
-        border-bottom: 1px solid var(--border);
+      .sub {
+        margin: 6px 0 0;
+        color: var(--muted);
         font-size: 14px;
       }
 
-      th {
-        color: var(--muted);
-        font-weight: 650;
-        font-size: 12px;
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        border-radius: 11px;
+        padding: 9px 12px;
+        font: 700 13px/1 "Space Grotesk", sans-serif;
+        letter-spacing: 0.2px;
+      }
+
+      .btn.primary {
+        color: #04252f;
+        background: linear-gradient(145deg, var(--cyan), #66f0de);
+      }
+
+      .btn.secondary {
+        color: #dceafd;
+        border: 1px solid rgba(170, 199, 255, 0.26);
+        background: rgba(15, 31, 50, 0.74);
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--panel);
+        overflow: hidden;
+      }
+
+      .head-row,
+      .row {
+        display: grid;
+        grid-template-columns: 72px minmax(160px, 1.5fr) minmax(200px, 1.3fr) 120px 220px;
+        gap: 8px;
+        align-items: center;
+        padding: 11px 14px;
+      }
+
+      .head-row {
+        border-bottom: 1px solid var(--line);
+        color: #9fc6ff;
+        font: 700 12px/1 "Space Grotesk", sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      .row {
+        border-bottom: 1px solid rgba(170, 199, 255, 0.12);
+      }
+
+      .row:last-child {
+        border-bottom: 0;
+      }
+
+      .filename {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .actions {
         display: flex;
-        gap: 8px;
-      }
-
-      .small {
-        font-size: 12px;
-        color: var(--muted);
+        flex-wrap: wrap;
+        gap: 6px;
       }
 
       .link {
-        color: #c4b5fd;
+        color: #a3d8ff;
         text-decoration: none;
+        border: 1px solid rgba(170, 199, 255, 0.2);
+        border-radius: 999px;
+        padding: 4px 8px;
+        font-size: 12px;
       }
 
       .empty {
+        padding: 18px;
         color: var(--muted);
-        font-size: 14px;
-        padding: 6px 2px;
       }
 
-      .warn {
+      .hint {
         margin-top: 10px;
-        color: #fde68a;
+        color: var(--muted);
         font-size: 12px;
+      }
+
+      .actions-top {
+        display: flex;
+        gap: 8px;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      @media (max-width: 980px) {
+        .head-row {
+          display: none;
+        }
+
+        .row {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+
+        .row div::before {
+          color: #9fc6ff;
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          display: block;
+          margin-bottom: 3px;
+        }
+
+        .row div:nth-child(1)::before { content: "ID"; }
+        .row div:nth-child(2)::before { content: "File"; }
+        .row div:nth-child(3)::before { content: "Uploaded"; }
+        .row div:nth-child(4)::before { content: "Messages"; }
+        .row div:nth-child(5)::before { content: "Actions"; }
       }
     </style>
   </head>
   <body>
     <div class="wrap">
       <div class="top">
-        <h1>Saved Reports</h1>
-        <a class="btn" href="/">Back to Analyzer</a>
+        <div>
+          <h1>Saved Reports</h1>
+          <p class="sub">Browse and reopen past chat analyses</p>
+        </div>
+        <div class="actions-top">
+          <a class="btn secondary" href="/docs" target="_blank" rel="noopener">API docs</a>
+          <a class="btn primary" href="/">New analysis</a>
+        </div>
       </div>
 
-      <div class="card">
-        <div id="empty" class="empty" style="display: none;">No reports saved yet. Upload a chat on the main page first.</div>
-        <table id="table" style="display: none;">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>File</th>
-              <th>Uploaded</th>
-              <th>Messages</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="rows"></tbody>
-        </table>
-      </div>
+      <section class="panel">
+        <div class="head-row">
+          <div>ID</div>
+          <div>File</div>
+          <div>Uploaded</div>
+          <div>Messages</div>
+          <div>Actions</div>
+        </div>
+        <div id="rows"></div>
+        <div id="empty" class="empty hidden">No reports yet. Analyze a chat first.</div>
+      </section>
 
-      <p class="small" style="margin-top: 10px;">Tip: open <code>/reports?format=json</code> for API output.</p>
+      <p class="hint">Tip: programmatic list endpoint is available at /api/reports</p>
     </div>
 
     <script>
       async function loadReports() {
-        const res = await fetch('/reports?format=json');
-        const data = await res.json();
-        const reports = data.reports || [];
+        const rows = document.getElementById("rows");
+        const empty = document.getElementById("empty");
+        rows.innerHTML = "";
 
-        const empty = document.getElementById('empty');
-        const table = document.getElementById('table');
-        const rows = document.getElementById('rows');
+        try {
+          const res = await fetch("/api/reports?limit=200&offset=0");
+          const reports = await res.json();
+          if (!res.ok) {
+            throw new Error(reports.detail || "Could not fetch reports.");
+          }
 
-        if (!reports.length) {
-          empty.style.display = 'block';
-          table.style.display = 'none';
-          return;
-        }
+          if (!reports.length) {
+            empty.style.display = "block";
+            return;
+          }
 
-        empty.style.display = 'none';
-        table.style.display = 'table';
-
-        for (const r of reports) {
-          const tr = document.createElement('tr');
-          const uploaded = new Date(r.uploaded_at).toLocaleString();
-          tr.innerHTML = `
-            <td>${r.id}</td>
-            <td>${r.filename}</td>
-            <td>${uploaded}</td>
-            <td>${r.message_count}</td>
-            <td>
-              <div class="actions">
-                <a class="link" href="/r/${r.id}">Open</a>
-                <a class="link" href="/reports/${r.id}" target="_blank" rel="noopener">JSON</a>
-                <a class="link" href="/reports/${r.id}/txt">TXT</a>
-              </div>
-            </td>
-          `;
-          rows.appendChild(tr);
+          empty.style.display = "none";
+          reports.forEach((r) => {
+            const uploaded = new Date(r.uploaded_at).toLocaleString();
+            const row = document.createElement("div");
+            row.className = "row";
+            row.innerHTML =
+              "<div>" + r.id + "</div>" +
+              "<div class='filename' title='" + r.filename + "'>" + r.filename + "</div>" +
+              "<div>" + uploaded + "</div>" +
+              "<div>" + r.message_count + "</div>" +
+              "<div class='actions'>" +
+                "<a class='link' href='/analytics/" + r.id + "'>Analytics</a>" +
+                "<a class='link' href='/r/" + r.id + "'>Open</a>" +
+                "<a class='link' href='/api/reports/" + r.id + "' target='_blank' rel='noopener'>JSON</a>" +
+                "<a class='link' href='/reports/" + r.id + "/txt'>TXT</a>" +
+              "</div>";
+            rows.appendChild(row);
+          });
+        } catch (err) {
+          empty.style.display = "block";
+          empty.textContent = "Error: " + err.message;
         }
       }
 
       loadReports();
     </script>
-    <p class="warn">Free Render without disk uses temporary storage; reports can reset after redeploy/restart.</p>
   </body>
 </html>

@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Dashboard - WhatsApp Analyzer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+        }
+
+        header p {
+            color: #94a3b8;
+            font-size: 1.1em;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            border-bottom: 2px solid rgba(15, 23, 42, 0.5);
+            padding-bottom: 15px;
+        }
+
+        .tab-button {
+            padding: 10px 20px;
+            background: rgba(51, 65, 85, 0.6);
+            border: 1px solid rgba(15, 23, 42, 0.5);
+            color: #e2e8f0;
+            cursor: pointer;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 0.95em;
+        }
+
+        .tab-button:hover {
+            background: rgba(51, 65, 85, 0.9);
+            border-color: #0ea5e9;
+        }
+
+        .tab-button.active {
+            background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+            border-color: #0ea5e9;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 35px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(15, 23, 42, 0.5);
+            border-radius: 12px;
+            padding: 35px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card:hover {
+            border-color: #0ea5e9;
+            box-shadow: 0 0 20px rgba(14, 165, 233, 0.1);
+        }
+
+        .card h3 {
+            font-size: 1.5em;
+            margin-bottom: 28px;
+            color: #0ea5e9;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-icon {
+            font-size: 1.5em;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 600px;
+            width: 100%;
+            flex: 1;
+        }
+
+        .stats-section {
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+        }
+
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            color: #0ea5e9;
+            font-weight: 700;
+            font-size: 1.1em;
+        }
+
+        .heatmap-grid {
+            display: grid;
+            grid-template-columns: repeat(24, 1fr);
+            gap: 4px;
+            margin: 15px 0;
+        }
+
+        .heatmap-cell {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7em;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .heatmap-cell:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 10px rgba(14, 165, 233, 0.3);
+        }
+
+        .word-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .word {
+            padding: 8px 16px;
+            background: rgba(14, 165, 233, 0.2);
+            border: 1px solid rgba(14, 165, 233, 0.4);
+            border-radius: 20px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .word:hover {
+            background: rgba(14, 165, 233, 0.4);
+            border-color: #0ea5e9;
+            transform: scale(1.05);
+        }
+
+        .network-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        .network-table th,
+        .network-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+        }
+
+        .network-table th {
+            background: rgba(15, 23, 42, 0.5);
+            color: #0ea5e9;
+            font-weight: 600;
+        }
+
+        .network-table tr:hover {
+            background: rgba(14, 165, 233, 0.05);
+        }
+
+        .responder-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid rgba(34, 197, 94, 0.5);
+            border-radius: 6px;
+            font-size: 0.9em;
+            color: #22c55e;
+            font-weight: 600;
+        }
+
+        .responder-badge.slow {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.5);
+            color: #ef4444;
+        }
+
+        .responder-badge.fast {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+            color: #3b82f6;
+        }
+
+        .topics-timeline {
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+
+        .month-label {
+            font-weight: 600;
+            color: #0ea5e9;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        .topic-list {
+            list-style: none;
+            padding-left: 15px;
+        }
+
+        .topic-list li {
+            padding: 5px 0;
+            color: #cbd5e1;
+            font-size: 0.9em;
+        }
+
+        .repeated-phrase-item {
+            background: rgba(15, 23, 42, 0.5);
+            border-left: 3px solid #0ea5e9;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 6px;
+        }
+
+        .phrase-text {
+            font-style: italic;
+            color: #cbd5e1;
+            margin-bottom: 8px;
+        }
+
+        .phrase-meta {
+            display: flex;
+            gap: 20px;
+            font-size: 0.9em;
+        }
+
+        .phrase-count {
+            color: #0ea5e9;
+            font-weight: 600;
+        }
+
+        .phrase-senders {
+            color: #94a3b8;
+        }
+
+        .loading {
+            text-align: center;
+            color: #94a3b8;
+            padding: 40px;
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            color: #ef4444;
+            margin: 20px 0;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 768px) {
+            .analytics-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            .heatmap-grid {
+                grid-template-columns: repeat(12, 1fr);
+            }
+
+            .chart-container {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Analytics Dashboard</h1>
+            <p id="reportTitle">Loading report...</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('sentiment', this)">💭 Sentiment Analysis</button>
+            <button class="tab-button" onclick="switchTab('heatmap', this)">🔥 Activity Heatmap</button>
+            <button class="tab-button" onclick="switchTab('network', this)">🕸️ Network</button>
+            <button class="tab-button" onclick="switchTab('wordcloud', this)">☁️ Word Cloud</button>
+            <button class="tab-button" onclick="switchTab('topics', this)">📈 Topics Timeline</button>
+            <button class="tab-button" onclick="switchTab('lengths', this)">📝 Message Lengths</button>
+            <button class="tab-button" onclick="switchTab('phrases', this)">🗂️ Phrase Repetition</button>
+        </div>
+
+        <!-- Sentiment Tab -->
+        <div id="sentiment" class="tab-content active">
+            <div class="analytics-grid">
+                <div class="card full-width">
+                    <h3><span class="card-icon">💭</span>Sentiment Distribution</h3>
+                    <div class="chart-container">
+                        <canvas id="sentimentChart"></canvas>
+                    </div>
+                    <div class="stats-section" id="sentimentStats"></div>
+                </div>
+                <div class="card full-width">
+                    <h3><span class="card-icon">👥</span>Sentiment by Sender</h3>
+                    <div class="chart-container">
+                        <canvas id="senderSentimentChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Heatmap Tab -->
+        <div id="heatmap" class="tab-content">
+            <div class="analytics-grid">
+                <div class="card full-width">
+                    <h3><span class="card-icon">🔥</span>Hourly Activity Heatmap</h3>
+                    <div class="chart-container">
+                        <canvas id="hourlyChart"></canvas>
+                    </div>
+                    <div class="stats-section" id="heatmapStats"></div>
+                </div>
+                <div class="card full-width">
+                    <h3><span class="card-icon">📅</span>Daily Activity Distribution</h3>
+                    <div class="chart-container">
+                        <canvas id="dailyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Tab -->
+        <div id="network" class="tab-content">
+            <div class="analytics-grid">
+                <div class="card full-width">
+                    <h3><span class="card-icon">🕸️</span>Top Interactions</h3>
+                    <table class="network-table">
+                        <thead>
+                            <tr>
+                                <th>From</th>
+                                <th>To</th>
+                                <th>Interactions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="networkTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Word Cloud Tab -->
+        <div id="wordcloud" class="tab-content">
+            <div class="analytics-grid">
+                <div class="card full-width">
+                    <h3><span class="card-icon">☁️</span>Most Frequent Words</h3>
+                    <div class="word-cloud" id="wordCloudContainer"></div>
+                    <div class="stats-section" id="wordstats"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Topics Timeline Tab -->
+        <div id="topics" class="tab-content">
+            <div class="analytics-grid">
+                <div class="card full-width">
+                    <h3><span class="card-icon">📈</span>Topics Over Time</h3>
+                    <div id="topicsContainer"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Message Lengths Tab -->
+        <div id="lengths" class="tab-content">
+            <div class="analytics-grid">
+                <div class="card">
+                    <h3><span class="card-icon">📊</span>Average Message Length</h3>
+                    <div class="chart-container">
+                        <canvas id="avgLengthChart"></canvas>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3><span class="card-icon">📝</span>Short vs Long Messages</h3>
+                    <div class="chart-container">
+                        <canvas id="lengthDistChart"></canvas>
+                    </div>
+                </div>
+                <div class="card full-width">
+                    <h3><span class="card-icon">👤</span>Sender Message Statistics</h3>
+                    <table class="network-table">
+                        <thead>
+                            <tr>
+                                <th>Sender</th>
+                                <th>Avg Length</th>
+                                <th>Max Length</th>
+                                <th>Short Messages %</th>
+                                <th>Long Messages %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lengthStatsTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Repeated Phrases Tab -->
+        <div id="phrases" class="tab-content">
+            <div class="analytics-grid">
+                <div class="card full-width">
+                    <h3><span class="card-icon">🗂️</span>Repeated Phrases</h3>
+                    <div id="phrasesContainer"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const reportId = window.location.pathname.split('/').filter(Boolean).pop() || 1;
+        let sentimentChart = null;
+        let senderSentimentChart = null;
+        let hourlyChart = null;
+        let dailyChart = null;
+        let avgLengthChart = null;
+        let lengthDistChart = null;
+
+        function switchTab(tab, buttonEl = null) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
+            
+            // Show selected tab
+            document.getElementById(tab).classList.add('active');
+            const activeButton = buttonEl || document.querySelector(`.tab-button[onclick*="'${tab}'"]`);
+            if (activeButton) activeButton.classList.add('active');
+
+            // Trigger chart resize for proper rendering
+            setTimeout(() => {
+                if (sentimentChart) sentimentChart.resize();
+                if (senderSentimentChart) senderSentimentChart.resize();
+                if (hourlyChart) hourlyChart.resize();
+                if (dailyChart) dailyChart.resize();
+                if (avgLengthChart) avgLengthChart.resize();
+                if (lengthDistChart) lengthDistChart.resize();
+            }, 100);
+        }
+
+        async function loadAnalytics() {
+            try {
+                document.getElementById('reportTitle').textContent = `Report #${reportId}`;
+
+                // Load sentiment data
+                const sentimentRes = await fetch(`/api/v2/reports/${reportId}/sentiment`);
+                const sentiment = await sentimentRes.json();
+                renderSentimentAnalysis(sentiment);
+
+                // Load heatmap data
+                const heatmapRes = await fetch(`/api/v2/reports/${reportId}/heatmap`);
+                const heatmap = await heatmapRes.json();
+                renderHeatmap(heatmap);
+
+                // Load network
+                const networkRes = await fetch(`/api/v2/reports/${reportId}/network`);
+                const network = await networkRes.json();
+                renderNetwork(network);
+
+                // Load word cloud
+                const wordRes = await fetch(`/api/v2/reports/${reportId}/wordcloud?top_n=40`);
+                const wordcloud = await wordRes.json();
+                renderWordCloud(wordcloud);
+
+                // Load topics timeline
+                const topicsRes = await fetch(`/api/v2/reports/${reportId}/topics-timeline`);
+                const topics = await topicsRes.json();
+                renderTopicsTimeline(topics);
+
+                // Load message lengths
+                const lengthsRes = await fetch(`/api/v2/reports/${reportId}/message-lengths`);
+                const lengths = await lengthsRes.json();
+                renderMessageLengths(lengths);
+
+                // Load repeated phrases
+                const phrasesRes = await fetch(`/api/v2/reports/${reportId}/repeated-phrases?min_occurrences=2`);
+                const phrases = await phrasesRes.json();
+                renderRepeatedPhrases(phrases);
+
+            } catch (error) {
+                console.error('Error loading analytics:', error);
+                document.body.innerHTML += `<div class="error">Error loading analytics: ${error.message}</div>`;
+            }
+        }
+
+        function renderSentimentAnalysis(data) {
+            const sentiment = data.sentiment_analysis || data;
+            const distribution = data.distribution || {
+                positive: sentiment.positive_ratio || 0,
+                neutral: sentiment.neutral_ratio || 0,
+                negative: sentiment.negative_ratio || 0
+            };
+            const perSender = data.per_sender || sentiment.by_sender || {};
+
+            const ctx = document.getElementById('sentimentChart').getContext('2d');
+            const labels = ['Positive', 'Neutral', 'Negative'];
+            const values = [distribution.positive || 0, distribution.neutral || 0, distribution.negative || 0];
+            
+            sentimentChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                        borderColor: '#1e293b',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#e2e8f0' } }
+                    }
+                }
+            });
+
+            // Sentiment stats
+            const statsHtml = `
+                <div class="stat-item">
+                    <span class="stat-label">Positive Messages</span>
+                    <span class="stat-value">${(distribution.positive || 0).toFixed(1)}%</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Neutral Messages</span>
+                    <span class="stat-value">${(distribution.neutral || 0).toFixed(1)}%</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Negative Messages</span>
+                    <span class="stat-value">${(distribution.negative || 0).toFixed(1)}%</span>
+                </div>
+            `;
+            document.getElementById('sentimentStats').innerHTML = statsHtml;
+
+            // Sender sentiment
+            const senderCtx = document.getElementById('senderSentimentChart').getContext('2d');
+            const senders = Object.keys(perSender);
+            const positiveByPerson = senders.map(s => perSender[s].positive_messages ?? perSender[s].positive ?? 0);
+            
+            senderSentimentChart = new Chart(senderCtx, {
+                type: 'bar',
+                data: {
+                    labels: senders,
+                    datasets: [{
+                        label: 'Positive Messages',
+                        data: positiveByPerson,
+                        backgroundColor: '#10b981'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#e2e8f0' } } },
+                    scales: {
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.2)' } },
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.2)' } }
+                    }
+                }
+            });
+        }
+
+        function renderHeatmap(data) {
+            const hourlyCtx = document.getElementById('hourlyChart').getContext('2d');
+            const hourly = data.hourly_activity || {};
+            const hours = Array.from({length: 24}, (_, i) => `${i}:00`);
+            const values = hours.map((_, i) => hourly[String(i)] ?? hourly[i] ?? 0);
+            
+            hourlyChart = new Chart(hourlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: hours,
+                    datasets: [{
+                        label: 'Messages',
+                        data: values,
+                        backgroundColor: 'rgba(14, 165, 233, 0.7)',
+                        borderColor: '#0ea5e9',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#e2e8f0' } } },
+                    scales: {
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.2)' } },
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.2)' } }
+                    }
+                }
+            });
+
+            const dailyCtx = document.getElementById('dailyChart').getContext('2d');
+            const daily = data.daily_activity || {};
+            const dailyLabels = Object.keys(daily);
+            const dailyValues = Object.values(daily);
+            
+            dailyChart = new Chart(dailyCtx, {
+                type: 'bar',
+                data: {
+                    labels: dailyLabels,
+                    datasets: [{
+                        label: 'Messages',
+                        data: dailyValues,
+                        backgroundColor: 'rgba(6, 182, 212, 0.7)',
+                        borderColor: '#06b6d4',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#e2e8f0' } } },
+                    scales: {
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.2)' } },
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.2)' } }
+                    }
+                }
+            });
+
+            document.getElementById('heatmapStats').innerHTML = `
+                <div class="stat-item">
+                    <span class="stat-label">Peak Hour</span>
+                    <span class="stat-value">${data.peak_hour}:00</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Most Active Day</span>
+                    <span class="stat-value">${data.peak_day}</span>
+                </div>
+            `;
+        }
+
+        function renderNetwork(data) {
+            const interactions = Array.isArray(data.interactions) ? data.interactions : [];
+            let html = '';
+            interactions.slice(0, 15).forEach(item => {
+                html += `
+                    <tr>
+                        <td>${item.from}</td>
+                        <td>${item.to}</td>
+                        <td><span class="stat-value">${item.count}</span></td>
+                    </tr>
+                `;
+            });
+            document.getElementById('networkTable').innerHTML = html;
+        }
+
+        function renderWordCloud(data) {
+            const words = data.words || {};
+            const maxFreq = Math.max(...Object.values(words));
+            let html = '';
+            Object.entries(words).forEach(([word, freq]) => {
+                const size = 0.8 + (freq / maxFreq) * 1.2;
+                html += `<div class="word" style="font-size: ${size}em;">${word}</div>`;
+            });
+            document.getElementById('wordCloudContainer').innerHTML = html;
+
+            document.getElementById('wordstats').innerHTML = `
+                <div class="stat-item">
+                    <span class="stat-label">Unique Words</span>
+                    <span class="stat-value">${data.unique_words}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Total Word Count</span>
+                    <span class="stat-value">${data.total_word_count}</span>
+                </div>
+            `;
+        }
+
+        function renderTopicsTimeline(data) {
+            const topics = data.topics_by_month || {};
+            let html = '';
+            Object.entries(topics).forEach(([month, words]) => {
+                html += `<div class="topics-timeline">
+                    <div class="month-label">📅 ${month}</div>
+                    <ul class="topic-list">`;
+                Object.entries(words)
+                    .slice(0, 8)
+                    .forEach(([word, freq]) => {
+                        html += `<li>${word} (${freq})</li>`;
+                    });
+                html += '</ul></div>';
+            });
+            document.getElementById('topicsContainer').innerHTML = html;
+        }
+
+        function renderMessageLengths(data) {
+            const senders = Object.keys(data.per_sender || {});
+            const avgLengths = senders.map(s => data.per_sender[s].average_length);
+            const ctx = document.getElementById('avgLengthChart').getContext('2d');
+            
+            avgLengthChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: senders,
+                    datasets: [{
+                        label: 'Avg Message Length (chars)',
+                        data: avgLengths,
+                        backgroundColor: 'rgba(168, 85, 247, 0.7)',
+                        borderColor: '#a855f7'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#e2e8f0' } } },
+                    scales: {
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.2)' } },
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.2)' } }
+                    }
+                }
+            });
+
+            const shortRatios = senders.map(s => data.per_sender[s].short_message_ratio);
+            const longRatios = senders.map(s => data.per_sender[s].long_message_ratio);
+            const ctx2 = document.getElementById('lengthDistChart').getContext('2d');
+            
+            lengthDistChart = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: senders,
+                    datasets: [
+                        {
+                            label: 'Short Messages %',
+                            data: shortRatios,
+                            backgroundColor: 'rgba(59, 130, 246, 0.7)'
+                        },
+                        {
+                            label: 'Long Messages %',
+                            data: longRatios,
+                            backgroundColor: 'rgba(236, 72, 153, 0.7)'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#e2e8f0' } } },
+                    scales: {
+                        x: { stacked: true, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.2)' } },
+                        y: { stacked: true, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.2)' } }
+                    }
+                }
+            });
+
+            let tableHtml = '';
+            senders.forEach(sender => {
+                const stats = data.per_sender[sender];
+                tableHtml += `
+                    <tr>
+                        <td>${sender}</td>
+                        <td>${stats.average_length}</td>
+                        <td>${stats.max_length}</td>
+                        <td>${stats.short_message_ratio}%</td>
+                        <td>${stats.long_message_ratio}%</td>
+                    </tr>
+                `;
+            });
+            document.getElementById('lengthStatsTable').innerHTML = tableHtml;
+        }
+
+        function renderRepeatedPhrases(data) {
+            const phrases = data.repeated_phrases || {};
+            let html = '';
+            Object.entries(phrases)
+                .slice(0, 20)
+                .forEach(([phrase, meta]) => {
+                    html += `
+                        <div class="repeated-phrase-item">
+                            <div class="phrase-text">"${phrase}"</div>
+                            <div class="phrase-meta">
+                                <span class="phrase-count">Occurrences: ${meta.count}</span>
+                                <span class="phrase-senders">Unique senders: ${meta.unique_senders}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+            document.getElementById('phrasesContainer').innerHTML = html || '<p style="color: #94a3b8;">No repeated phrases found</p>';
+        }
+
+        // Load data on page load
+        window.addEventListener('load', loadAnalytics);
+    </script>
+</body>
+</html>

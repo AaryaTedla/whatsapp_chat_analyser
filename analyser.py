@@ -1,19 +1,15 @@
 import json
 import os
-import random
 import re
 from collections import Counter
 from typing import Any, Dict, List, Optional
 
-import pandas as pd
-from dotenv import load_dotenv
+import polars as pl
 from openai import OpenAI
 
-load_dotenv()
+from core.config import OPENROUTER_API_KEY, OPENROUTER_MODEL
 
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-# Default to Gemma 3 4B; override in .env via OPENROUTER_MODEL when needed.
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemma-3-4b-it:free")
+
 
 
 STOP_WORDS = {
@@ -127,71 +123,113 @@ def _pick_sample(messages: List[Dict[str, Any]], n: int = 50) -> List[Dict[str, 
 
 def compute_stats(messages: List[Dict[str, Any]], top_senders: int = 10, top_words: int = 20) -> Dict[str, Any]:
     """
-    Compute stats from parsed messages.
-
-    Expects each item to have: date, time, datetime (ISO string or None), sender, message.
+    Compute stats from parsed messages using Polars with lazy evaluation.
+    
+    Expects each item to have: date, time, datetime, sender, message.
     """
-    df = pd.DataFrame(messages)
-    if df.empty:
+    if not messages:
         return {
             "total_messages": 0,
+            "unique_senders": 0,
             "senders": {"labels": [], "counts": []},
             "hours": {"labels": [], "counts": []},
             "days": {"labels": [], "counts": []},
             "top_words": [],
         }
 
-    # Only compute time-series metrics for valid datetimes.
-    df_time = df[df["datetime"].notna()].copy()
-    df_time["datetime"] = pd.to_datetime(df_time["datetime"], errors="coerce")
-    df_time = df_time[df_time["datetime"].notna()]
+    # Create lazy dataframe
+    df_lazy = pl.LazyFrame(messages)
+    
+    # Collect for basic stats
+    df = df_lazy.collect()
+    
+    total_messages = len(df)
+    unique_senders = df.select(pl.col("sender")).n_unique()
 
-    df_time["hour"] = df_time["datetime"].dt.hour
-    df_time["date_only"] = df_time["datetime"].dt.strftime("%Y-%m-%d")
-
-    total_messages = int(len(df))
-
-    senders_series = df["sender"].fillna("Unknown").value_counts().head(top_senders)
-    senders_labels = senders_series.index.tolist()
-    senders_counts = senders_series.values.tolist()
-
-    hours_counts = (
-        df_time.groupby("hour")
-        .size()
-        .reindex(range(24), fill_value=0)
+    # Process timestamps lazily
+    df_time_lazy = (
+        df_lazy
+        .filter(pl.col("datetime").is_not_null())
+        .with_columns(
+            pl.col("datetime").str.to_datetime(),
+        )
+        .with_columns(
+            hour=pl.col("datetime").dt.hour(),
+            date_only=pl.col("datetime").dt.strftime("%Y-%m-%d"),
+        )
     )
-    hours_labels = [f"{h:02d}" for h in range(24)]
-    hours_data = hours_counts.values.tolist()
-
-    days_series = df_time.groupby("date_only").size().sort_index()
-    days_labels_raw = days_series.index.tolist()
-    days_data_raw = days_series.values.tolist()
-    # Cap to 400 points to avoid huge responses and Chart.js overload
-    max_days = 400
-    if len(days_labels_raw) > max_days:
-        df_ts = df_time.copy()
-        df_ts["date_only"] = pd.to_datetime(df_ts["date_only"])
-        weekly = df_ts.groupby(df_ts["date_only"].dt.to_period("W").astype(str)).size()
-        days_labels = weekly.index.tolist()[:max_days]
-        days_data = weekly.values.tolist()[:max_days]
+    
+    df_time = df_time_lazy.collect()
+    
+    if len(df_time) == 0:
+        df_time = df
+        has_time = False
     else:
-        days_labels = days_labels_raw
-        days_data = days_data_raw
+        has_time = True
 
-    # Tokenize for "most used words".
+    # Senders
+    senders_stats = (
+        df.lazy()
+        .select(pl.col("sender").fill_null("Unknown"))
+        .group_by("sender")
+        .agg(pl.len().alias("count"))
+        .sort("count", descending=True)
+        .limit(top_senders)
+        .collect()
+    )
+    
+    senders_labels = senders_stats["sender"].to_list()
+    senders_counts = senders_stats["count"].to_list()
+
+    # Hours of day
+    if has_time:
+        hours_data = [0] * 24
+        for h in df_time["hour"].to_list():
+            if 0 <= h < 24:
+                hours_data[h] += 1
+        hours_labels = [f"{h:02d}" for h in range(24)]
+    else:
+        hours_labels = [f"{h:02d}" for h in range(24)]
+        hours_data = [0] * 24
+
+    # Days over time
+    if has_time:
+        days_stats = (
+            df_time_lazy
+            .group_by("date_only")
+            .agg(pl.len().alias("count"))
+            .sort("date_only")
+            .collect()
+        )
+        days_labels = days_stats["date_only"].to_list()
+        days_data = days_stats["count"].to_list()
+        
+        # Cap to 400 points
+        max_days = 400
+        if len(days_labels) > max_days:
+            # Downsample to weekly
+            step = len(days_labels) // max_days + 1
+            days_labels = days_labels[::step]
+            days_data = days_data[::step]
+    else:
+        days_labels = []
+        days_data = []
+
+    # Top words using lazy evaluation
+    messages_text = df.select(pl.col("message")).to_series().to_list()
     tokens: List[str] = []
-    for msg in df["message"].fillna("").astype(str).tolist():
-        msg = msg.lower()
-        tokens.extend(WORD_RE.findall(msg))
+    for msg in messages_text:
+        if msg:
+            msg_str = str(msg).lower()
+            tokens.extend(WORD_RE.findall(msg_str))
 
-    # Filter stop words + short tokens.
     filtered = [t for t in tokens if t not in STOP_WORDS and len(t) >= 2]
     counter = Counter(filtered)
     top = counter.most_common(top_words)
 
     return {
-        "total_messages": total_messages,
-        "unique_senders": int(df["sender"].nunique()),
+        "total_messages": int(total_messages),
+        "unique_senders": int(unique_senders),
         "senders": {"labels": senders_labels, "counts": senders_counts},
         "hours": {"labels": hours_labels, "counts": hours_data},
         "days": {"labels": days_labels, "counts": days_data},
@@ -375,308 +413,647 @@ def _local_fallback_summary(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
-def generate_ai_summary(messages: List[Dict[str, Any]], max_messages: int = 50) -> Dict[str, Any]:
+def generate_ai_summary(
+    messages: List[Dict[str, Any]],
+    max_messages: int = 50,
+) -> Dict[str, Any]:
     """
-    Ask OpenRouter (via the OpenAI SDK) for:
-    - overall vibe summary
-    - top 3 recurring topics
-    - one funny observation
+    Async AI summary generation with fallback.
     """
-    api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
-    if not api_key:
-        return {
-            "error": "Missing OPENROUTER_API_KEY in .env",
-            "vibe_summary": None,
-            "top_3_topics": [],
-            "funny_observation": None,
-        }
+    if not OPENROUTER_API_KEY:
+        result = _local_fallback_summary(messages)
+        result["error"] = "Missing OPENROUTER_API_KEY"
+        return result
 
-    # Prefer actual chat lines (skip system-ish senders when possible).
     candidates = [
-        m
-        for m in messages
+        m for m in messages
         if m.get("message")
         and str(m.get("message")).strip()
         and m.get("sender") not in {"System", "Unknown", None, ""}
     ]
-    if len(candidates) >= 3:
-        sample_pool = candidates
-    else:
-        sample_pool = messages
-
+    sample_pool = candidates if len(candidates) >= 3 else messages
     sample = _pick_sample(sample_pool, n=max_messages)
 
     def fmt_line(m: Dict[str, Any]) -> str:
         sender = (m.get("sender") or "Unknown").strip()
-        date = m.get("date") or ""
-        time = m.get("time") or ""
+        date = m.get("date", "")
+        time = m.get("time", "")
         ts = f"{date} {time}".strip()
-        body = str(m.get("message") or "").strip().replace("\n", " ")
+        body = str(m.get("message", "")).strip().replace("\n", " ")
         if len(body) > 300:
             body = body[:300] + "..."
         return f"{ts} - {sender}: {body}"
 
     sample_text = "\n".join(fmt_line(m) for m in sample)
 
-    prompt = f"""You are analyzing a WhatsApp chat.
-
-Return ONLY valid JSON with this exact shape:
+    prompt = f"""Analyze this WhatsApp chat and return ONLY valid JSON with this shape:
 {{"vibe_summary":"...", "top_3_topics":["...","...","..."], "funny_observation":"..."}}
 
 Rules:
-1) vibe_summary: 2-4 short sentences about the overall tone.
-2) top_3_topics: exactly 3 concise topic phrases.
-3) funny_observation: one light, harmless observation grounded in the chat sample.
-4) Do NOT use placeholder words like topic1/topic2/topic3 or template phrases.
-5) No markdown, no code fences, no extra keys.
+1. vibe_summary: 2-4 short sentences on overall tone
+2. top_3_topics: exactly 3 concise topic phrases (not placeholders)
+3. funny_observation: one light observation grounded in the chat
+4. No markdown, no code fences, no extra keys
 
-Chat sample:
+Chat:
 {sample_text}"""
 
-    client = OpenAI(base_url=OPENROUTER_BASE_URL, api_key=api_key)
+    client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_API_KEY)
 
-    def extract_content(msg) -> str:
-        """Extract text from message; handles various response shapes."""
-        raw = getattr(msg, "content", None) or getattr(msg, "text", None)
-        if isinstance(raw, str) and raw.strip():
-            return raw.strip()
-        if isinstance(raw, list):
-            texts = []
-            for p in raw:
-                if isinstance(p, dict):
-                    texts.append(p.get("text") or p.get("content") or "")
-                elif hasattr(p, "text"):
-                    texts.append(str(getattr(p, "text", "") or ""))
-                elif hasattr(p, "model_dump"):
-                    d = p.model_dump()
-                    texts.append(str(d.get("text") or d.get("content") or ""))
-                else:
-                    texts.append(str(p))
-            s = " ".join(t for t in texts if t).strip()
-            if s:
-                return s
-        if hasattr(msg, "model_dump"):
-            d = msg.model_dump()
-            c = d.get("content")
-            if isinstance(c, str) and c.strip():
-                return c.strip()
-            if isinstance(c, list):
-                out = []
-                for x in c:
-                    if isinstance(x, dict):
-                        out.append(x.get("text") or x.get("content") or "")
-                    elif hasattr(x, "model_dump"):
-                        out.append(str(x.model_dump().get("text") or x.model_dump().get("content") or ""))
-                    else:
-                        out.append(str(x))
-                s = " ".join(t for t in out if t).strip()
-                if s:
-                    return s
-
-        # Last-resort deep scan across all keys in model_dump shape.
-        if hasattr(msg, "model_dump"):
-            try:
-                values = _deep_collect_text(msg.model_dump())
-                if values:
-                    return " ".join(values).strip()
-            except Exception:
-                pass
-
-        return ""
-
-    def _call_model(prompt_text: str):
-        try:
-            return client.chat.completions.create(
-                model=OPENROUTER_MODEL,
-                messages=[{"role": "user", "content": prompt_text}],
-                temperature=0.3,
-                max_tokens=512,
-                response_format={"type": "json_object"},
-            )
-        except Exception:
-            # Some providers/models don't support response_format=json_object.
-            return client.chat.completions.create(
-                model=OPENROUTER_MODEL,
-                messages=[{"role": "user", "content": prompt_text}],
-                temperature=0.3,
-                max_tokens=512,
-            )
-
-    def _parse_summary_fields(parsed_obj: Dict[str, Any]):
-        vibe_val = parsed_obj.get("vibe_summary") or parsed_obj.get("summary") or parsed_obj.get("overall_vibe")
-        vibe_val = str(vibe_val).strip() if vibe_val else None
-
-        topics_val = parsed_obj.get("top_3_topics") or parsed_obj.get("topics") or parsed_obj.get("main_topics")
-        if isinstance(topics_val, list):
-            topics_val = [str(t).strip() for t in topics_val[:3] if t]
-        elif isinstance(topics_val, str):
-            topics_val = [t.strip() for t in topics_val.replace(",", " ").split()[:3] if t.strip()]
-        else:
-            topics_val = []
-
-        funny_val = parsed_obj.get("funny_observation") or parsed_obj.get("funny_note") or parsed_obj.get("observation")
-        funny_val = str(funny_val).strip() if funny_val else None
-
-        return vibe_val, topics_val, funny_val
-
-    resp = None
     try:
-        resp = _call_model(prompt)
-        if not resp.choices:
-            return {
-                "error": "API returned no choices",
-                "vibe_summary": None,
-                "top_3_topics": [],
-                "funny_observation": None,
-            }
-        content = extract_content(resp.choices[0].message)
-        if not content and hasattr(resp, "model_dump"):
+        response = client.chat.completions.create(
+            model=OPENROUTER_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=512,
+        )
+        
+        content = response.choices[0].message.content.strip()
+        
+        # Extract JSON
+        start = content.find("{")
+        end = content.rfind("}")
+        if start != -1 and end != -1 and end > start:
             try:
-                all_texts = _deep_collect_text(resp.model_dump())
-                if all_texts:
-                    content = " ".join(all_texts).strip()
-            except Exception:
+                return json.loads(content[start:end+1])
+            except json.JSONDecodeError:
                 pass
-
-        if not content:
-            try:
-                import httpx
-                with httpx.Client(timeout=60) as h:
-                    r = h.post(
-                        f"{OPENROUTER_BASE_URL}/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {api_key}",
-                            "Content-Type": "application/json",
-                        },
-                        json={
-                            "model": OPENROUTER_MODEL,
-                            "messages": [{"role": "user", "content": prompt}],
-                            "temperature": 0.3,
-                            "max_tokens": 512,
-                        },
-                    )
-                    r.raise_for_status()
-                    data = r.json()
-                    texts = _deep_collect_text(data)
-                    if texts:
-                        content = " ".join(texts).strip()
-            except Exception:
-                pass
+        
+        return _local_fallback_summary(messages)
+    
     except Exception as e:
+        result = _local_fallback_summary(messages)
+        result["error"] = str(e)
+        return result
+
+
+def analyze_sentiment(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Analyze sentiment of messages using keyword-based heuristics and optionally AI.
+    Returns sentiment scores and trends.
+    """
+    if not messages:
         return {
-            "error": str(e),
-            "vibe_summary": None,
-            "top_3_topics": [],
-            "funny_observation": None,
+            "overall_sentiment": "neutral",
+            "positive_ratio": 0.0,
+            "negative_ratio": 0.0,
+            "neutral_ratio": 1.0,
+            "by_sender": {},
+            "timeline": []
         }
-
-    if not content:
-        debug_finish = None
-        debug_payload = None
-        try:
-            if resp and getattr(resp, "choices", None):
-                debug_finish = getattr(resp.choices[0], "finish_reason", None)
-            if resp and hasattr(resp, "model_dump"):
-                debug_payload = json.dumps(resp.model_dump(), ensure_ascii=True)[:1200]
-        except Exception:
-            pass
-        if debug_payload:
-            print("[generate_ai_summary] Empty extracted content from provider response:")
-            print(debug_payload)
-        return {
-            "error": (
-                "Model returned empty."
-                + (f" finish_reason={debug_finish}" if debug_finish else "")
-                + " Check Flask terminal for response structure."
-            ),
-            "vibe_summary": None,
-            "top_3_topics": [],
-            "funny_observation": None,
-        }
-
-    try:
-        parsed = _extract_json_object(content) or {}
-    except Exception:
-        parsed = {}
-
-    vibe, topics, funny = _parse_summary_fields(parsed)
-
-    if not parsed and content:
-        # One retry with stricter guidance before falling back locally.
-        try:
-            retry_prompt = (
-                prompt
-                + "\n\nImportant: your previous response was not usable JSON. "
-                + "Return only concrete JSON values from this chat sample."
-            )
-            retry_resp = _call_model(retry_prompt)
-            retry_content = ""
-            if retry_resp.choices:
-                retry_content = extract_content(retry_resp.choices[0].message)
-            retry_parsed = _extract_json_object(retry_content) or {}
-            if retry_parsed:
-                parsed = retry_parsed
-                content = retry_content or content
-                vibe, topics, funny = _parse_summary_fields(parsed)
-                print("[generate_ai_summary] REAL AI SUMMARY RETURNED (after retry)")
-                return {
-                    "vibe_summary": vibe or None,
-                    "top_3_topics": topics,
-                    "funny_observation": funny or None,
-                    "raw": content or None,
-                }
-        except Exception:
-            pass
-
-        print("[generate_ai_summary] USING LOCAL FALLBACK - AI response was not valid JSON")
-        fallback = _local_fallback_summary(messages)
-        fallback["raw"] = content[:400] if content else None
-        fallback["note"] = "Fallback summary used because model response was not valid JSON."
-        return fallback
-
-    topics_are_placeholders = bool(topics) and all(_is_placeholder_text(t) for t in topics)
-    if _is_placeholder_text(vibe) or _is_placeholder_text(funny) or topics_are_placeholders:
-        # Retry once with explicit anti-placeholder instruction.
-        try:
-            retry_prompt = (
-                prompt
-                + "\n\nImportant: do NOT output placeholders like topic1/topic2/topic3 or template text. "
-                + "Use only concrete, evidence-based content from this chat sample."
-            )
-            retry_resp = _call_model(retry_prompt)
-            retry_content = ""
-            if retry_resp.choices:
-                retry_content = extract_content(retry_resp.choices[0].message)
-            retry_parsed = _extract_json_object(retry_content) or {}
-            retry_vibe, retry_topics, retry_funny = _parse_summary_fields(retry_parsed)
-            retry_topics_are_placeholders = bool(retry_topics) and all(_is_placeholder_text(t) for t in retry_topics)
-            if (
-                retry_parsed
-                and not _is_placeholder_text(retry_vibe)
-                and not _is_placeholder_text(retry_funny)
-                and not retry_topics_are_placeholders
-            ):
-                print("[generate_ai_summary] REAL AI SUMMARY RETURNED (after retry)")
-                return {
-                    "vibe_summary": retry_vibe or None,
-                    "top_3_topics": retry_topics,
-                    "funny_observation": retry_funny or None,
-                    "raw": retry_content or content or None,
-                }
-        except Exception:
-            pass
-
-        print("[generate_ai_summary] USING LOCAL FALLBACK - AI response contained placeholders")
-        fallback = _local_fallback_summary(messages)
-        fallback["raw"] = content[:400] if content else None
-        fallback["note"] = "Fallback summary used because model returned template placeholders."
-        return fallback
-
-    print("[generate_ai_summary] REAL AI SUMMARY RETURNED")
+    
+    positive_words = {
+        "good", "great", "awesome", "amazing", "excellent", "nice", "love", 
+        "happy", "wonderful", "perfect", "fantastic", "brilliant", "cool",
+        "awesome", "yay", "lol", "haha", "thanks", "thank", "best"
+    }
+    
+    negative_words = {
+        "bad", "terrible", "awful", "hate", "angry", "sad", "disappointed",
+        "stupid", "dumb", "sucks", "annoyed", "frustrated", "worst", "horrible",
+        "disgusting", "ugh", "no", "nope", "nahi"
+    }
+    
+    sentiments = []
+    by_sender = {}
+    
+    for msg in messages:
+        text = str(msg.get("message", "")).lower()
+        sender = msg.get("sender", "Unknown")
+        
+        if not text.strip():
+            sentiment = "neutral"
+        else:
+            pos_count = sum(1 for word in positive_words if word in text)
+            neg_count = sum(1 for word in negative_words if word in text)
+            
+            if pos_count > neg_count:
+                sentiment = "positive"
+            elif neg_count > pos_count:
+                sentiment = "negative"
+            else:
+                sentiment = "neutral"
+        
+        sentiments.append(sentiment)
+        
+        if sender not in by_sender:
+            by_sender[sender] = {"positive": 0, "negative": 0, "neutral": 0}
+        by_sender[sender][sentiment] += 1
+    
+    total = len(sentiments)
+    positive_count = sentiments.count("positive")
+    negative_count = sentiments.count("negative")
+    
     return {
-        "vibe_summary": vibe or None,
-        "top_3_topics": topics,
-        "funny_observation": funny or None,
-        "raw": content or None,
+        "overall_sentiment": "positive" if positive_count > negative_count else ("negative" if negative_count > positive_count else "neutral"),
+        "positive_ratio": round(positive_count / total * 100, 2) if total > 0 else 0,
+        "negative_ratio": round(negative_count / total * 100, 2) if total > 0 else 0,
+        "neutral_ratio": round((total - positive_count - negative_count) / total * 100, 2) if total > 0 else 100,
+        "by_sender": {sender: {k: v for k, v in counts.items()} for sender, counts in by_sender.items()}
     }
 
+
+def analyze_emojis(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Analyze emoji usage across the chat.
+    Returns most used emojis and emoji distribution by sender.
+    """
+    import unicodedata
+    
+    emoji_pattern = re.compile(
+        r"["
+        r"\U0001F600-\U0001F64F"  # emoticons
+        r"\U0001F300-\U0001F5FF"  # symbols & pictographs
+        r"\U0001F680-\U0001F6FF"  # transport & map symbols
+        r"\U0001F700-\U0001F77F"  # alchemical symbols
+        r"\U0001F780-\U0001F7FF"  # Geometric Shapes Extended
+        r"\U0001F800-\U0001F8FF"  # Supplemental Arrows-C
+        r"\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
+        r"\U0001FA00-\U0001FA6F"  # Chess Symbols
+        r"\U0001FA70-\U0001FAFF"  # Symbols and Pictographs Extended-A
+        r"\U000200D"  # zero width joiner
+        r"\U0000FE0F"  # dingbats
+        r"]+",
+        flags=re.UNICODE
+    )
+    
+    all_emojis = []
+    by_sender = {}
+    
+    for msg in messages:
+        text = msg.get("message", "")
+        sender = msg.get("sender", "Unknown")
+        
+        if text:
+            emojis = emoji_pattern.findall(str(text))
+            all_emojis.extend(emojis)
+            
+            if sender not in by_sender:
+                by_sender[sender] = {}
+            
+            for emoji in emojis:
+                by_sender[sender][emoji] = by_sender[sender].get(emoji, 0) + 1
+    
+    emoji_counts = Counter(all_emojis)
+    top_emojis = emoji_counts.most_common(15)
+    
+    return {
+        "total_emoji_count": len(all_emojis),
+        "unique_emojis": len(emoji_counts),
+        "top_emojis": [{"emoji": e, "count": c} for e, c in top_emojis],
+        "by_sender": {sender: sorted([(e, c) for e, c in emojis.items()], key=lambda x: x[1], reverse=True)[:5] 
+                     for sender, emojis in by_sender.items() if emojis}
+    }
+
+
+def analyze_mentions(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Analyze mentions (@mentions) in the chat.
+    """
+    mention_pattern = re.compile(r"@[\w\s]+")
+    
+    all_mentions = []
+    mention_by_sender = {}
+    
+    for msg in messages:
+        text = msg.get("message", "")
+        sender = msg.get("sender", "Unknown")
+        
+        if text:
+            mentions = mention_pattern.findall(str(text).lower())
+            all_mentions.extend(mentions)
+            
+            if sender not in mention_by_sender:
+                mention_by_sender[sender] = []
+            mention_by_sender[sender].extend(mentions)
+    
+    mention_counts = Counter(all_mentions)
+    top_mentions = mention_counts.most_common(10)
+    
+    return {
+        "total_mentions": len(all_mentions),
+        "unique_mentions": len(mention_counts),
+        "top_mentions": [{"mention": m, "count": c} for m, c in top_mentions],
+        "mention_by_sender": {sender: Counter(mentions).most_common(5) for sender, mentions in mention_by_sender.items() if mentions}
+    }
+
+
+def analyze_links_and_media(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Analyze links, images, videos, and other media mentions in the chat.
+    """
+    url_pattern = re.compile(r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+")
+    media_indicators = {
+        "image": [".jpg", ".jpeg", ".png", ".gif", ".webp", "<image omitted>"],
+        "video": [".mp4", ".avi", ".mov", ".mkv", "<video omitted>"],
+        "audio": [".mp3", ".wav", ".m4a", ".aac", "<audio omitted>"],
+        "document": [".pdf", ".doc", ".docx", ".xlsx", ".pptx", "<document omitted>"],
+    }
+    
+    links = []
+    media_counts = {"image": 0, "video": 0, "audio": 0, "document": 0}
+    by_sender = {}
+    
+    for msg in messages:
+        text = str(msg.get("message", ""))
+        sender = msg.get("sender", "Unknown")
+        
+        if sender not in by_sender:
+            by_sender[sender] = {"links": 0, "media": 0}
+        
+        # Extract URLs
+        urls = url_pattern.findall(text)
+        links.extend(urls)
+        by_sender[sender]["links"] += len(urls)
+        
+        # Check for media indicators
+        text_lower = text.lower()
+        for media_type, indicators in media_indicators.items():
+            if any(ind in text_lower for ind in indicators):
+                media_counts[media_type] += 1
+                by_sender[sender]["media"] += 1
+    
+    return {
+        "total_links": len(links),
+        "unique_links": len(set(links)),
+        "sample_links": list(set(links))[:10],
+        "media_distribution": media_counts,
+        "by_sender": by_sender
+    }
+
+
+def detect_languages(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Detect languages in messages using simple heuristics.
+    Returns detected languages and their distribution.
+    """
+    def detect_simple_language(text: str) -> str:
+        """Simple language detection based on character ranges and common words."""
+        if not text:
+            return "unknown"
+        
+        text_lower = text.lower()
+        
+        # Check for common words/patterns
+        hindi_indicators = ["hai", "hain", "kya", "nahi", "acha", "theek", "arre", "wo", "yeh"]
+        spanish_indicators = ["que", "como", "pero", "porque", "gracias", "hola", "es"]
+        french_indicators = ["le", "la", "est", "de", "et", "pour", "bonjour"]
+        
+        hindi_count = sum(1 for word in hindi_indicators if word in text_lower)
+        spanish_count = sum(1 for word in spanish_indicators if word in text_lower)
+        french_count = sum(1 for word in french_indicators if word in text_lower)
+        
+        if hindi_count > 0:
+            return "hindi"
+        if spanish_count > french_count:
+            return "spanish"
+        if french_count > 0:
+            return "french"
+        
+        return "english"
+    
+    languages = []
+    for msg in messages:
+        text = msg.get("message", "")
+        if text:
+            lang = detect_simple_language(str(text))
+            languages.append(lang)
+    
+    lang_counts = Counter(languages)
+    
+    return {
+        "detected_languages": dict(lang_counts),
+        "primary_language": lang_counts.most_common(1)[0][0] if lang_counts else "unknown",
+        "language_distribution": {lang: round(count / len(languages) * 100, 2) 
+                                 for lang, count in lang_counts.items()} if languages else {}
+    }
+
+
+def analyze_response_patterns(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Analyze response times and patterns between messages.
+    Returns conversation flow metrics.
+    """
+    if len(messages) < 2:
+        return {"average_response_time": None, "conversation_continuity": 0.0}
+    
+    time_diffs = []
+    same_sender_count = 0
+    total_pairs = 0
+    
+    for i in range(1, len(messages)):
+        prev_msg = messages[i-1]
+        curr_msg = messages[i]
+        
+        # Simple continuity: count messages from same sender
+        if prev_msg.get("sender") == curr_msg.get("sender"):
+            same_sender_count += 1
+        
+        total_pairs += 1
+    
+    conversation_continuity = (1 - (same_sender_count / total_pairs)) if total_pairs > 0 else 0
+    
+    return {
+        "total_messages": len(messages),
+        "conversation_continuity": round(conversation_continuity * 100, 2),
+        "average_message_length": round(
+            sum(len(str(m.get("message", ""))) for m in messages) / len(messages), 2
+        ) if messages else 0,
+        "short_message_ratio": round(
+            sum(1 for m in messages if len(str(m.get("message", ""))) < 10) / len(messages) * 100, 2
+        ) if messages else 0
+    }
+
+
+def analyze_conversation_heatmap(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Analyze activity by hour of day and day of week.
+    Returns heatmap data for visualization.
+    """
+    from datetime import datetime as dt_cls
+    
+    hourly_activity = Counter()  # 0-23 hours
+    daily_activity = Counter()   # 0-6 (Monday-Sunday)
+    
+    for msg in messages:
+        dt = msg.get("datetime")
+        if dt:
+            # Handle string ISO format or datetime object
+            if isinstance(dt, str):
+                try:
+                    dt = dt_cls.fromisoformat(dt)
+                except:
+                    continue
+            
+            if isinstance(dt, dt_cls):
+                hourly_activity[dt.hour] += 1
+                daily_activity[dt.weekday()] += 1
+    
+    # Ensure all hours/days have entries
+    hourly_dict = {i: hourly_activity.get(i, 0) for i in range(24)}
+    daily_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    daily_dict = {daily_names[i]: daily_activity.get(i, 0) for i in range(7)}
+    
+    return {
+        "hourly_activity": hourly_dict,
+        "daily_activity": daily_dict,
+        "peak_hour": max(hourly_dict.items(), key=lambda x: x[1])[0] if hourly_dict else 0,
+        "peak_day": max(daily_dict.items(), key=lambda x: x[1])[0] if daily_dict else "Monday"
+    }
+
+
+def analyze_response_times(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Analyze response times between consecutive messages.
+    Identify slow and fast responders.
+    """
+    from datetime import datetime as dt_cls
+    
+    if len(messages) < 2:
+        return {"average_response_time_minutes": 0, "slow_responders": [], "fast_responders": []}
+    
+    response_times_by_sender = {}  # sender -> list of response times (seconds)
+    
+    for i in range(1, len(messages)):
+        prev_msg = messages[i-1]
+        curr_msg = messages[i]
+        
+        # Skip if same sender (not a response, just continuation)
+        if prev_msg.get("sender") == curr_msg.get("sender"):
+            continue
+        
+        prev_dt = prev_msg.get("datetime")
+        curr_dt = curr_msg.get("datetime")
+        
+        # Parse datetime strings if needed
+        if prev_dt and isinstance(prev_dt, str):
+            try:
+                prev_dt = dt_cls.fromisoformat(prev_dt)
+            except:
+                prev_dt = None
+        if curr_dt and isinstance(curr_dt, str):
+            try:
+                curr_dt = dt_cls.fromisoformat(curr_dt)
+            except:
+                curr_dt = None
+        
+        if prev_dt and curr_dt and isinstance(prev_dt, dt_cls) and isinstance(curr_dt, dt_cls) and curr_dt > prev_dt:
+            time_diff = (curr_dt - prev_dt).total_seconds()
+            responder = curr_msg.get("sender", "Unknown")
+            
+            if responder not in response_times_by_sender:
+                response_times_by_sender[responder] = []
+            response_times_by_sender[responder].append(time_diff)
+    
+    # Calculate averages per sender
+    avg_response_times = {}
+    for sender, times in response_times_by_sender.items():
+        avg_times = sum(times) / len(times)
+        avg_response_times[sender] = round(avg_times / 60, 2)  # Convert to minutes
+    
+    overall_avg = round(sum(avg_response_times.values()) / len(avg_response_times), 2) if avg_response_times else 0
+    
+    # Determine slow/fast
+    if avg_response_times:
+        threshold_slow = overall_avg * 1.5
+        threshold_fast = overall_avg * 0.5
+        slow_responders = {k: v for k, v in avg_response_times.items() if v > threshold_slow}
+        fast_responders = {k: v for k, v in avg_response_times.items() if v < threshold_fast}
+    else:
+        slow_responders = {}
+        fast_responders = {}
+    
+    return {
+        "average_response_time_minutes": overall_avg,
+        "all_responders": avg_response_times,
+        "slow_responders": slow_responders,
+        "fast_responders": fast_responders
+    }
+
+
+def analyze_network_graph(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Analyze who talks to whom most.
+    Returns interaction matrix showing conversation patterns.
+    """
+    interactions = Counter()  # (sender, next_speaker) tuples
+    sender_counts = Counter()
+    
+    for i in range(len(messages) - 1):
+        curr_sender = messages[i].get("sender", "Unknown")
+        next_sender = messages[i+1].get("sender", "Unknown")
+        
+        if curr_sender != next_sender:  # Only count when sender changes
+            interactions[(curr_sender, next_sender)] += 1
+            sender_counts[curr_sender] += 1
+    
+    # Get top interactions as list of dicts
+    top_interactions_list = [
+        {"from": sender, "to": recipient, "count": count}
+        for (sender, recipient), count in interactions.most_common(20)
+    ]
+    
+    # Build adjacency structure
+    network = {}
+    for item in top_interactions_list:
+        sender = item["from"]
+        recipient = item["to"]
+        count = item["count"]
+        if sender not in network:
+            network[sender] = {}
+        network[sender][recipient] = count
+    
+    return {
+        "interactions": top_interactions_list,
+        "network": network,
+        "total_unique_speakers": len(sender_counts)
+    }
+
+
+def get_word_cloud_data(messages: List[Dict[str, Any]], top_n: int = 50) -> Dict[str, Any]:
+    """
+    Extract most frequent words for word cloud visualization.
+    """
+    all_words = []
+    
+    for msg in messages:
+        text = str(msg.get("message", "")).lower()
+        # Remove URLs and media markers
+        text = re.sub(r'https?://\S+', '', text)
+        text = re.sub(r'<.*?>', '', text)
+        # Split and filter
+        words = re.findall(r'\b\w+\b', text)
+        all_words.extend([w for w in words if w not in STOP_WORDS and len(w) > 2])
+    
+    word_freq = Counter(all_words)
+    top_words = dict(word_freq.most_common(top_n))
+    
+    return {
+        "words": top_words,
+        "unique_words": len(word_freq),
+        "total_word_count": len(all_words)
+    }
+
+
+def analyze_topics_over_time(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Track how topics/keywords change over months.
+    """
+    from datetime import datetime as dt_cls
+    
+    messages_by_month = {}  # month_str -> list of messages
+    
+    for msg in messages:
+        dt = msg.get("datetime")
+        if dt:
+            # Handle string ISO format or datetime object
+            if isinstance(dt, str):
+                try:
+                    dt = dt_cls.fromisoformat(dt)
+                except:
+                    continue
+            
+            if isinstance(dt, dt_cls):
+                month_key = dt.strftime("%Y-%m")
+                if month_key not in messages_by_month:
+                    messages_by_month[month_key] = []
+                messages_by_month[month_key].append(msg)
+    
+    # Get top words for each month
+    topics_by_month = {}
+    for month, month_messages in sorted(messages_by_month.items()):
+        all_words = []
+        for msg in month_messages:
+            text = str(msg.get("message", "")).lower()
+            text = re.sub(r'https?://\S+', '', text)
+            text = re.sub(r'<.*?>', '', text)
+            words = re.findall(r'\b\w+\b', text)
+            all_words.extend([w for w in words if w not in STOP_WORDS and len(w) > 2])
+        
+        word_freq = Counter(all_words)
+        topics_by_month[month] = dict(word_freq.most_common(10))
+    
+    return {
+        "topics_by_month": topics_by_month,
+        "total_months": len(topics_by_month)
+    }
+
+
+def analyze_message_length_distribution(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Analyze message length distribution by sender.
+    Identify who writes short vs long messages.
+    """
+    sender_messages = {}  # sender -> list of message lengths
+    
+    for msg in messages:
+        sender = msg.get("sender", "Unknown")
+        msg_text = str(msg.get("message", ""))
+        msg_len = len(msg_text)
+        
+        if sender not in sender_messages:
+            sender_messages[sender] = []
+        sender_messages[sender].append(msg_len)
+    
+    # Calculate stats per sender
+    sender_stats = {}
+    for sender, lengths in sender_messages.items():
+        avg_len = sum(lengths) / len(lengths) if lengths else 0
+        max_len = max(lengths) if lengths else 0
+        min_len = min(lengths) if lengths else 0
+        long_msg_ratio = sum(1 for l in lengths if l > 100) / len(lengths) * 100 if lengths else 0
+        short_msg_ratio = sum(1 for l in lengths if l < 20) / len(lengths) * 100 if lengths else 0
+        
+        sender_stats[sender] = {
+            "average_length": round(avg_len, 2),
+            "max_length": max_len,
+            "min_length": min_len,
+            "total_messages": len(lengths),
+            "long_message_ratio": round(long_msg_ratio, 2),
+            "short_message_ratio": round(short_msg_ratio, 2)
+        }
+    
+    return {
+        "per_sender": sender_stats,
+        "longest_average": max((v["average_length"], k) for k, v in sender_stats.items())[1] if sender_stats else None,
+        "shortest_average": min((v["average_length"], k) for k, v in sender_stats.items())[1] if sender_stats else None
+    }
+
+
+def detect_repeated_phrases(messages: List[Dict[str, Any]], min_occurrences: int = 3) -> Dict[str, Any]:
+    """
+    Detect recurring messages, memes, and inside jokes.
+    """
+    # Group by exact message text
+    message_freq = Counter()
+    message_senders = {}  # message -> list of senders who said it
+    
+    for msg in messages:
+        text = str(msg.get("message", "")).strip()
+        sender = msg.get("sender", "Unknown")
+        
+        # Only consider reasonably short messages (likely to be memes/jokes)
+        if 2 < len(text) < 200:
+            message_freq[text] += 1
+            if text not in message_senders:
+                message_senders[text] = []
+            message_senders[text].append(sender)
+    
+    # Get messages that appear at least min_occurrences times
+    repeated = {msg: count for msg, count in message_freq.most_common(50) 
+                if count >= min_occurrences}
+    
+    result = {}
+    for msg, count in sorted(repeated.items(), key=lambda x: x[1], reverse=True):
+        senders = message_senders.get(msg, [])
+        unique_senders = list(set(senders))
+        result[msg] = {
+            "count": count,
+            "senders": unique_senders,
+            "unique_senders": len(unique_senders)
+        }
+    
+    return {
+        "repeated_phrases": result,
+        "total_unique_repeated": len(result)
+    }

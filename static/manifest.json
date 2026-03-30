@@ -1,0 +1,68 @@
+{
+  "name": "Lumira - Chat Analyzer",
+  "short_name": "Lumira",
+  "description": "Professional AI-powered WhatsApp chat analyzer",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#7c3aed",
+  "background_color": "#0a0e13",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%237c3aed' width='192' height='192' rx='45'/><text x='96' y='145' text-anchor='middle' font-size='120' font-weight='bold' fill='white'>L</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%237c3aed' width='192' height='192' rx='45'/><text x='96' y='145' text-anchor='middle' font-size='120' font-weight='bold' fill='white'>L</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect fill='%237c3aed' width='512' height='512'/><text x='256' y='385' text-anchor='middle' font-size='320' font-weight='bold' fill='white'>L</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "screenshots": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 720'><rect fill='%230a0e13' width='540' height='720'/><text x='270' y='360' text-anchor='middle' font-size='80' fill='%237c3aed'>Lumira</text></svg>",
+      "sizes": "540x720",
+      "type": "image/svg+xml",
+      "form_factor": "narrow"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Analyze Chat",
+      "short_name": "Analyze",
+      "description": "Quickly analyze a WhatsApp export",
+      "url": "/?mode=analyze",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%237c3aed' width='192' height='192'/><text x='96' y='145' text-anchor='middle' font-size='120' font-weight='bold' fill='white'>📊</text></svg>",
+          "sizes": "192x192",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "View Reports",
+      "short_name": "Reports",
+      "description": "View your saved analysis reports",
+      "url": "/reports.html",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%237c3aed' width='192' height='192'/><text x='96' y='145' text-anchor='middle' font-size='120' font-weight='bold' fill='white'>📋</text></svg>",
+          "sizes": "192x192",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ]
+}
