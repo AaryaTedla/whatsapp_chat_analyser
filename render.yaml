@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: whatsapp_chat_analyser
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        value: google/gemma-3-4b-it:free
+      - key: DB_PATH
+        value: /tmp/lumira_reports.db

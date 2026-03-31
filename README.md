@@ -265,12 +265,20 @@ If `OPENROUTER_MODEL` is not set, the app defaults to `google/gemma-3-4b-it:free
 
 ## Render Deployment
 
+- Add `runtime.txt` to pin a stable Python version supported by all packages:
+  - `python-3.11.9`
+- Recommended: deploy via `render.yaml` (already included in this repo)
 - Build command: `pip install -r requirements.txt`
-- Start command: `gunicorn app:app`
+- Start command: `uvicorn app:app --host 0.0.0.0 --port $PORT`
 - Env vars:
   - `OPENROUTER_API_KEY`
   - `OPENROUTER_MODEL`
   - `DB_PATH=/tmp/lumira_reports.db` (default/free-tier-friendly)
+
+### Common Render Build Fix
+
+If logs show Python `3.14` during build, dependencies like `pydantic-core` may fail to compile.
+Pinning Python with `runtime.txt` avoids this and uses prebuilt wheels.
 
 ### Free Tier Note
 
